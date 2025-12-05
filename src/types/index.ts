@@ -46,6 +46,7 @@ export interface CallResult {
   transcript?: string;
   duration?: number; // in seconds
   callId?: string;
+  recordingUrl?: string; // VAPI call recording URL
 }
 
 export interface Quote {

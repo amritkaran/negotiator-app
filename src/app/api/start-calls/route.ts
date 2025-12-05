@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { makeOutboundCall, getCallStatus, extractQuoteFromTranscript } from "@/lib/vapi";
+import { makeOutboundCall } from "@/lib/vapi";
 import { Business, UserRequirement } from "@/types";
+import { saveCallRecord, updateCallRecord, getCallRecordByCallId } from "@/lib/call-history";
 
 // Store active calls and lowest prices in memory (use Redis/DB in production)
 const activeCalls = new Map<
@@ -54,6 +55,33 @@ export async function POST(request: NextRequest) {
           businessId: business.id,
           status,
           startedAt: new Date(),
+        });
+
+        // Save to call history
+        const reqs = requirements as UserRequirement;
+        await saveCallRecord({
+          callId,
+          vendorName: business.name,
+          vendorPhone: business.phone,
+          dateTime: new Date().toISOString(),
+          duration: 0,
+          status: "in_progress",
+          requirements: {
+            service: reqs.service,
+            from: reqs.from || "",
+            to: reqs.to || "",
+            date: reqs.date || "",
+            time: reqs.time || "",
+            passengers: reqs.passengers,
+            vehicleType: reqs.vehicleType,
+            tripType: reqs.tripType,
+          },
+          quotedPrice: null,
+          negotiatedPrice: null,
+          transcript: null,
+          recordingUrl: null,
+          notes: null,
+          sessionId,
         });
 
         results.push({
