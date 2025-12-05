@@ -961,7 +961,7 @@ What can I help you find today?`,
         awaitingDecision: true,
         lastCallSummary: {
           vendorName: vendor.name,
-          vendorPhone: vendor.phoneNumber || "N/A",
+          vendorPhone: vendor.phone || "N/A",
           quotedPrice: quote?.price || null,
           negotiatedPrice: quote?.price || null, // For now, same as quoted
           callDuration: 60, // Placeholder - actual duration would come from Vapi

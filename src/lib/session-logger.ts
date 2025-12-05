@@ -20,6 +20,11 @@ export interface SessionLog {
     time?: string;
     passengers?: number;
     vehicleType?: string;
+    tripType?: "one-way" | "round-trip";
+    waitingTime?: number;
+    tollPreference?: "ok" | "avoid" | "no-preference";
+    specialInstructions?: string;
+    preferredVendors?: string[];
   };
   research?: {
     businessesFound: number;

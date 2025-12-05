@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       rating: 4.5,
       reviewCount: 100,
       distance: 5,
+      placeId: "test-place-id",
       types: ["taxi"],
     };
 
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
       time: "10 AM",
       passengers: 2,
       vehicleType: "sedan",
+      isComplete: true,
+      missingFields: [],
     };
 
     console.log(`[Test Call] Initiating call to ${phoneNumber}`);
