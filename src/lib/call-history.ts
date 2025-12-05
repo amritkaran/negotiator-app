@@ -1,9 +1,8 @@
 /**
- * Call History Storage - Persists call records using Vercel Postgres
+ * Call History Storage - Persists call records using Neon Serverless Postgres
  */
 
-import { sql } from "@vercel/postgres";
-import { initializeDatabase } from "./db";
+import { getDb, initializeDatabase } from "./db";
 
 export interface CallHistoryRecord {
   id: string;
@@ -55,7 +54,9 @@ function rowToRecord(row: Record<string, unknown>): CallHistoryRecord {
     callId: row.call_id as string,
     vendorName: row.vendor_name as string,
     vendorPhone: row.vendor_phone as string,
-    dateTime: (row.date_time as Date).toISOString(),
+    dateTime: row.date_time instanceof Date
+      ? row.date_time.toISOString()
+      : String(row.date_time),
     duration: row.duration as number,
     status: row.status as CallHistoryRecord["status"],
     requirements: row.requirements as CallHistoryRecord["requirements"],
@@ -72,6 +73,7 @@ export async function saveCallRecord(
   record: Omit<CallHistoryRecord, "id">
 ): Promise<CallHistoryRecord> {
   await ensureDb();
+  const sql = getDb();
 
   const result = await sql`
     INSERT INTO call_history (
@@ -95,8 +97,8 @@ export async function saveCallRecord(
     RETURNING *
   `;
 
-  console.log(`[call-history] Saved call record: ${result.rows[0].id}`);
-  return rowToRecord(result.rows[0]);
+  console.log(`[call-history] Saved call record: ${result[0].id}`);
+  return rowToRecord(result[0]);
 }
 
 export async function updateCallRecord(
@@ -104,106 +106,68 @@ export async function updateCallRecord(
   updates: Partial<CallHistoryRecord>
 ): Promise<CallHistoryRecord | null> {
   await ensureDb();
+  const sql = getDb();
 
-  // Build dynamic update query
-  const setClauses: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
-
-  if (updates.status !== undefined) {
-    setClauses.push(`status = $${paramIndex++}`);
-    values.push(updates.status);
-  }
-  if (updates.duration !== undefined) {
-    setClauses.push(`duration = $${paramIndex++}`);
-    values.push(updates.duration);
-  }
-  if (updates.quotedPrice !== undefined) {
-    setClauses.push(`quoted_price = $${paramIndex++}`);
-    values.push(updates.quotedPrice);
-  }
-  if (updates.negotiatedPrice !== undefined) {
-    setClauses.push(`negotiated_price = $${paramIndex++}`);
-    values.push(updates.negotiatedPrice);
-  }
-  if (updates.transcript !== undefined) {
-    setClauses.push(`transcript = $${paramIndex++}`);
-    values.push(updates.transcript);
-  }
-  if (updates.recordingUrl !== undefined) {
-    setClauses.push(`recording_url = $${paramIndex++}`);
-    values.push(updates.recordingUrl);
-  }
-  if (updates.notes !== undefined) {
-    setClauses.push(`notes = $${paramIndex++}`);
-    values.push(updates.notes);
-  }
-
-  setClauses.push(`updated_at = NOW()`);
-
-  if (setClauses.length === 1) {
-    // Only updated_at, nothing to update
-    const existing = await getCallRecord(id);
-    return existing;
-  }
-
-  // Use sql template for the update
+  // Use COALESCE to only update provided fields
   const result = await sql`
     UPDATE call_history
     SET
-      status = COALESCE(${updates.status}, status),
-      duration = COALESCE(${updates.duration}, duration),
-      quoted_price = COALESCE(${updates.quotedPrice}, quoted_price),
-      negotiated_price = COALESCE(${updates.negotiatedPrice}, negotiated_price),
-      transcript = COALESCE(${updates.transcript}, transcript),
-      recording_url = COALESCE(${updates.recordingUrl}, recording_url),
-      notes = COALESCE(${updates.notes}, notes),
+      status = COALESCE(${updates.status ?? null}, status),
+      duration = COALESCE(${updates.duration ?? null}, duration),
+      quoted_price = COALESCE(${updates.quotedPrice ?? null}, quoted_price),
+      negotiated_price = COALESCE(${updates.negotiatedPrice ?? null}, negotiated_price),
+      transcript = COALESCE(${updates.transcript ?? null}, transcript),
+      recording_url = COALESCE(${updates.recordingUrl ?? null}, recording_url),
+      notes = COALESCE(${updates.notes ?? null}, notes),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
   `;
 
-  if (result.rows.length === 0) {
+  if (result.length === 0) {
     console.log(`[call-history] Record not found: ${id}`);
     return null;
   }
 
   console.log(`[call-history] Updated call record: ${id}`);
-  return rowToRecord(result.rows[0]);
+  return rowToRecord(result[0]);
 }
 
 export async function getCallRecord(id: string): Promise<CallHistoryRecord | null> {
   await ensureDb();
+  const sql = getDb();
 
   const result = await sql`
     SELECT * FROM call_history WHERE id = ${id}
   `;
 
-  if (result.rows.length === 0) {
+  if (result.length === 0) {
     return null;
   }
 
-  return rowToRecord(result.rows[0]);
+  return rowToRecord(result[0]);
 }
 
 export async function getCallRecordByCallId(
   callId: string
 ): Promise<CallHistoryRecord | null> {
   await ensureDb();
+  const sql = getDb();
 
   const result = await sql`
     SELECT * FROM call_history WHERE call_id = ${callId}
   `;
 
-  if (result.rows.length === 0) {
+  if (result.length === 0) {
     return null;
   }
 
-  return rowToRecord(result.rows[0]);
+  return rowToRecord(result[0]);
 }
 
 export async function getAllCallRecords(limit: number = 50): Promise<CallHistoryRecord[]> {
   await ensureDb();
+  const sql = getDb();
 
   const result = await sql`
     SELECT * FROM call_history
@@ -211,13 +175,14 @@ export async function getAllCallRecords(limit: number = 50): Promise<CallHistory
     LIMIT ${limit}
   `;
 
-  return result.rows.map(rowToRecord);
+  return result.map(rowToRecord);
 }
 
 export async function getCallRecordsBySession(
   sessionId: string
 ): Promise<CallHistoryRecord[]> {
   await ensureDb();
+  const sql = getDb();
 
   const result = await sql`
     SELECT * FROM call_history
@@ -225,18 +190,19 @@ export async function getCallRecordsBySession(
     ORDER BY date_time DESC
   `;
 
-  return result.rows.map(rowToRecord);
+  return result.map(rowToRecord);
 }
 
 export async function deleteCallRecord(id: string): Promise<boolean> {
   await ensureDb();
+  const sql = getDb();
 
   const result = await sql`
     DELETE FROM call_history WHERE id = ${id}
     RETURNING id
   `;
 
-  const deleted = result.rows.length > 0;
+  const deleted = result.length > 0;
   if (deleted) {
     console.log(`[call-history] Deleted call record: ${id}`);
   }
@@ -245,6 +211,7 @@ export async function deleteCallRecord(id: string): Promise<boolean> {
 
 export async function clearAllRecords(): Promise<void> {
   await ensureDb();
+  const sql = getDb();
   await sql`DELETE FROM call_history`;
   console.log(`[call-history] Cleared all records`);
 }

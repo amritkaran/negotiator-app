@@ -1,8 +1,19 @@
-import { sql } from "@vercel/postgres";
+import { neon } from "@neondatabase/serverless";
+
+// Get database connection
+function getDb() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  return neon(databaseUrl);
+}
 
 // Initialize the database tables
 export async function initializeDatabase() {
   try {
+    const sql = getDb();
+
     // Create call_history table
     await sql`
       CREATE TABLE IF NOT EXISTS call_history (
@@ -59,10 +70,14 @@ export async function initializeDatabase() {
 // Check if database is connected
 export async function checkConnection() {
   try {
+    const sql = getDb();
     const result = await sql`SELECT 1 as connected`;
-    return result.rows[0]?.connected === 1;
+    return result[0]?.connected === 1;
   } catch (error) {
     console.error("[db] Connection check failed:", error);
     return false;
   }
 }
+
+// Export getDb for use in other modules
+export { getDb };
