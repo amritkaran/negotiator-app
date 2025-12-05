@@ -146,6 +146,14 @@ export async function makeOutboundCall(
         endCallFunctionEnabled: true,
         endCallMessage: "धन्यवाद, शुभ दिन!",
         maxDurationSeconds: 180, // 3 minutes max
+        recordingEnabled: true, // Enable call recording
+        artifactPlan: {
+          recordingEnabled: true,
+          videoRecordingEnabled: false,
+          transcriptPlan: {
+            enabled: true,
+          },
+        },
       },
       metadata: {
         businessId: business.id,
