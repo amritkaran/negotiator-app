@@ -324,30 +324,30 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                               <div className="space-y-1 text-sm">
                                 <p>
                                   <span className="text-gray-500">Service:</span>{" "}
-                                  {record.requirements.service}
+                                  <span className="text-gray-800">{record.requirements.service}</span>
                                 </p>
                                 <p>
                                   <span className="text-gray-500">From:</span>{" "}
-                                  {record.requirements.from}
+                                  <span className="text-gray-800">{record.requirements.from}</span>
                                 </p>
                                 <p>
                                   <span className="text-gray-500">To:</span>{" "}
-                                  {record.requirements.to}
+                                  <span className="text-gray-800">{record.requirements.to}</span>
                                 </p>
                                 <p>
                                   <span className="text-gray-500">Date:</span>{" "}
-                                  {record.requirements.date}
+                                  <span className="text-gray-800">{record.requirements.date}</span>
                                 </p>
                                 <p>
                                   <span className="text-gray-500">Time:</span>{" "}
-                                  {record.requirements.time}
+                                  <span className="text-gray-800">{record.requirements.time}</span>
                                 </p>
                                 {record.requirements.passengers && (
                                   <p>
                                     <span className="text-gray-500">
                                       Passengers:
                                     </span>{" "}
-                                    {record.requirements.passengers}
+                                    <span className="text-gray-800">{record.requirements.passengers}</span>
                                   </p>
                                 )}
                                 {record.requirements.vehicleType && (
@@ -355,7 +355,7 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                                     <span className="text-gray-500">
                                       Vehicle:
                                     </span>{" "}
-                                    {record.requirements.vehicleType}
+                                    <span className="text-gray-800">{record.requirements.vehicleType}</span>
                                   </p>
                                 )}
                                 {record.requirements.tripType && (
@@ -363,7 +363,7 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                                     <span className="text-gray-500">
                                       Trip Type:
                                     </span>{" "}
-                                    {record.requirements.tripType}
+                                    <span className="text-gray-800">{record.requirements.tripType}</span>
                                   </p>
                                 )}
                               </div>
@@ -384,7 +384,7 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                                       ₹{record.quotedPrice}
                                     </span>
                                   ) : (
-                                    <span className="text-gray-400">
+                                    <span className="text-gray-600 italic">
                                       Not quoted
                                     </span>
                                   )}
@@ -404,7 +404,7 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                                 {record.notes && (
                                   <p>
                                     <span className="text-gray-500">Notes:</span>{" "}
-                                    {record.notes}
+                                    <span className="text-gray-800">{record.notes}</span>
                                   </p>
                                 )}
                               </div>

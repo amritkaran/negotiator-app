@@ -72,6 +72,20 @@ export async function makeOutboundCall(
         language: "multi" as const,
       };
 
+  // Configure voice (TTS) based on language mode
+  // - Hindi/English mode: Cartesia (low latency, good Hindi support)
+  // - Regional mode: Azure Neural TTS (supports Kannada, Telugu, Tamil, etc.)
+  const voice = useRegionalLanguages
+    ? {
+        provider: "azure" as const,
+        voiceId: "hi-IN-SwaraNeural", // Hindi female voice, can speak multiple Indian languages
+      }
+    : {
+        provider: "cartesia" as const,
+        voiceId: "95d51f79-c397-46f9-b49a-23763d3eaa2d", // Arushi Hinglish female voice
+        language: "hi" as const,
+      };
+
   // TEST MODE: If TEST_PHONE_NUMBER is set, use it instead of the vendor's number
   const testPhoneNumber = process.env.TEST_PHONE_NUMBER;
 
@@ -148,11 +162,7 @@ export async function makeOutboundCall(
             },
           ],
         },
-        voice: {
-          provider: "cartesia",
-          voiceId: "95d51f79-c397-46f9-b49a-23763d3eaa2d", // Arushi Hinglish female voice
-          language: "hi",
-        },
+        voice,
         firstMessage: firstMessage,
         transcriber,
         endCallFunctionEnabled: true,
