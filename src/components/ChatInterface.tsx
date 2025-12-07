@@ -506,6 +506,9 @@ What can I help you find today?`,
   const [showPromptReview, setShowPromptReview] = useState(false);
   const [showPerformanceDashboard, setShowPerformanceDashboard] = useState(false);
 
+  // Language preference for transcription
+  const [languageMode, setLanguageMode] = useState<"hindi-english" | "regional">("hindi-english");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -835,6 +838,7 @@ What can I help you find today?`,
           businesses: [vendor],
           requirements,
           sessionId,
+          languageMode,
         }),
       });
 
@@ -1657,7 +1661,39 @@ What can I help you find today?`,
           )}
 
           {stage === "businesses_found" && (
-            <div className="px-4 pb-2 space-y-2">
+            <div className="px-4 pb-2 space-y-3">
+              {/* Language Mode Selector */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                <p className="text-xs font-medium text-gray-600 mb-2">Vendor Language Preference</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setLanguageMode("hindi-english")}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      languageMode === "hindi-english"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                    }`}
+                  >
+                    🇮🇳 Hindi / English
+                  </button>
+                  <button
+                    onClick={() => setLanguageMode("regional")}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      languageMode === "regional"
+                        ? "bg-green-600 text-white"
+                        : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                    }`}
+                  >
+                    🗣️ Regional
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {languageMode === "hindi-english"
+                    ? "Best for Hindi, English, or Hinglish speakers (faster)"
+                    : "Supports Kannada, Telugu, Tamil, Bengali & more"}
+                </p>
+              </div>
+
               <button
                 onClick={handleStartSimulation}
                 className="w-full bg-purple-600 text-white py-3 rounded-xl font-medium hover:bg-purple-700 transition-colors"

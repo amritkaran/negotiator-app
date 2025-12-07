@@ -18,7 +18,7 @@ const sessionLowestPrices = new Map<string, number>();
 
 export async function POST(request: NextRequest) {
   try {
-    const { businesses, requirements, sessionId } = await request.json();
+    const { businesses, requirements, sessionId, languageMode } = await request.json();
 
     if (!businesses || !requirements || !sessionId) {
       return NextResponse.json(
@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Language mode: "hindi-english" (Deepgram Nova-3 multi) or "regional" (Google STT)
+    const useRegionalLanguages = languageMode === "regional";
 
     // Get existing lowest price for this session (if any)
     let lowestPriceSoFar = sessionLowestPrices.get(sessionId);
@@ -46,7 +49,8 @@ export async function POST(request: NextRequest) {
         const { callId, status } = await makeOutboundCall(
           business,
           requirements as UserRequirement,
-          lowestPriceSoFar
+          lowestPriceSoFar,
+          useRegionalLanguages
         );
 
         // Store call info

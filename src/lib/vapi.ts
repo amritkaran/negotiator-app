@@ -51,10 +51,26 @@ function createFirstMessage(requirements: UserRequirement, businessName: string)
 export async function makeOutboundCall(
   business: Business,
   requirements: UserRequirement,
-  lowestPriceSoFar?: number
+  lowestPriceSoFar?: number,
+  useRegionalLanguages?: boolean
 ): Promise<{ callId: string; status: string }> {
   const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar);
   const firstMessage = createFirstMessage(requirements, business.name);
+
+  // Configure transcriber based on language mode
+  // - Hindi/English mode: Deepgram Nova-3 with "multi" (faster, code-switching)
+  // - Regional mode: Google STT (supports Kannada, Telugu, Tamil, Bengali, etc.)
+  const transcriber = useRegionalLanguages
+    ? {
+        provider: "google" as const,
+        model: "latest_long" as const,
+        languageCode: "hi-IN", // Primary language, but Google auto-detects others
+      }
+    : {
+        provider: "deepgram" as const,
+        model: "nova-3" as const,
+        language: "multi" as const,
+      };
 
   // TEST MODE: If TEST_PHONE_NUMBER is set, use it instead of the vendor's number
   const testPhoneNumber = process.env.TEST_PHONE_NUMBER;
@@ -138,11 +154,7 @@ export async function makeOutboundCall(
           language: "hi",
         },
         firstMessage: firstMessage,
-        transcriber: {
-          provider: "deepgram",
-          model: "nova-3",
-          language: "multi", // Multilingual detection
-        },
+        transcriber,
         endCallFunctionEnabled: true,
         endCallMessage: "धन्यवाद, शुभ दिन!",
         maxDurationSeconds: 180, // 3 minutes max
