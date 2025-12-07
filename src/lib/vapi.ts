@@ -48,23 +48,39 @@ function createFirstMessage(requirements: UserRequirement, businessName: string)
   return `Hello! Main Preet bol rahi hoon. Kya meri baat ${businessName} se ho rahi hai?`;
 }
 
+// Azure Neural TTS voice mappings for Indian languages
+const AZURE_VOICE_MAP: Record<string, { voiceId: string; languageCode: string }> = {
+  hi: { voiceId: "hi-IN-SwaraNeural", languageCode: "hi-IN" },
+  kn: { voiceId: "kn-IN-SapnaNeural", languageCode: "kn-IN" },
+  te: { voiceId: "te-IN-ShrutiNeural", languageCode: "te-IN" },
+  ta: { voiceId: "ta-IN-PallaviNeural", languageCode: "ta-IN" },
+  bn: { voiceId: "bn-IN-TanishaaNeural", languageCode: "bn-IN" },
+  mr: { voiceId: "mr-IN-AarohiNeural", languageCode: "mr-IN" },
+  gu: { voiceId: "gu-IN-DhwaniNeural", languageCode: "gu-IN" },
+};
+
 export async function makeOutboundCall(
   business: Business,
   requirements: UserRequirement,
   lowestPriceSoFar?: number,
-  useRegionalLanguages?: boolean
+  useRegionalLanguages?: boolean,
+  regionalLanguage?: string
 ): Promise<{ callId: string; status: string }> {
   const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar);
   const firstMessage = createFirstMessage(requirements, business.name);
 
+  // Get Azure voice config for selected regional language
+  const selectedLang = regionalLanguage || "hi";
+  const azureConfig = AZURE_VOICE_MAP[selectedLang] || AZURE_VOICE_MAP.hi;
+
   // Configure transcriber based on language mode
   // - Hindi/English mode: Deepgram Nova-3 with "multi" (faster, code-switching)
-  // - Regional mode: Google STT (supports Kannada, Telugu, Tamil, Bengali, etc.)
+  // - Regional mode: Google STT with specific language code
   const transcriber = useRegionalLanguages
     ? {
         provider: "google" as const,
         model: "latest_long" as const,
-        languageCode: "hi-IN", // Primary language, but Google auto-detects others
+        languageCode: azureConfig.languageCode,
       }
     : {
         provider: "deepgram" as const,
@@ -74,11 +90,11 @@ export async function makeOutboundCall(
 
   // Configure voice (TTS) based on language mode
   // - Hindi/English mode: Cartesia (low latency, good Hindi support)
-  // - Regional mode: Azure Neural TTS (supports Kannada, Telugu, Tamil, etc.)
+  // - Regional mode: Azure Neural TTS with language-specific voice
   const voice = useRegionalLanguages
     ? {
         provider: "azure" as const,
-        voiceId: "hi-IN-SwaraNeural", // Hindi female voice, can speak multiple Indian languages
+        voiceId: azureConfig.voiceId,
       }
     : {
         provider: "cartesia" as const,

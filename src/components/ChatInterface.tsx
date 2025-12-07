@@ -508,6 +508,7 @@ What can I help you find today?`,
 
   // Language preference for transcription
   const [languageMode, setLanguageMode] = useState<"hindi-english" | "regional">("hindi-english");
+  const [regionalLanguage, setRegionalLanguage] = useState<"hi" | "kn" | "te" | "ta" | "bn" | "mr" | "gu">("hi");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -839,6 +840,7 @@ What can I help you find today?`,
           requirements,
           sessionId,
           languageMode,
+          regionalLanguage: languageMode === "regional" ? regionalLanguage : undefined,
         }),
       });
 
@@ -1687,11 +1689,27 @@ What can I help you find today?`,
                     🗣️ Regional
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {languageMode === "hindi-english"
-                    ? "Best for Hindi, English, or Hinglish speakers (faster)"
-                    : "Supports Kannada, Telugu, Tamil, Bengali & more"}
-                </p>
+                {languageMode === "hindi-english" ? (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Best for Hindi, English, or Hinglish speakers (faster)
+                  </p>
+                ) : (
+                  <div className="mt-2">
+                    <select
+                      value={regionalLanguage}
+                      onChange={(e) => setRegionalLanguage(e.target.value as typeof regionalLanguage)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="hi">Hindi (हिंदी)</option>
+                      <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                      <option value="te">Telugu (తెలుగు)</option>
+                      <option value="ta">Tamil (தமிழ்)</option>
+                      <option value="bn">Bengali (বাংলা)</option>
+                      <option value="mr">Marathi (मराठी)</option>
+                      <option value="gu">Gujarati (ગુજરાતી)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <button
