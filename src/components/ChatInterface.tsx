@@ -9,6 +9,7 @@ import { LearningPanel } from "./LearningPanel";
 import { PerformanceGraphs } from "./PerformanceGraphs";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 import { PromptChangeReview } from "./PromptChangeReview";
+import Link from "next/link";
 import {
   PerformanceStore,
   SimulationMetrics,
@@ -1598,6 +1599,13 @@ What can I help you find today?`,
               </span>
             )}
           </button>
+          <Link
+            href="/history"
+            className="flex items-center gap-2 text-sm text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg shadow-md transition-colors"
+          >
+            <span>📞</span>
+            <span>Call History</span>
+          </Link>
           <button
             onClick={handleReset}
             className="text-sm text-gray-300 hover:text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
