@@ -1559,6 +1559,45 @@ What can I help you find today?`,
     setShowPromptReview(false);
   };
 
+  // Handler for calling more vendors (continue from where we left off)
+  const handleCallMoreVendors = () => {
+    // Get vendors that haven't been called yet
+    const calledIds = Array.from(callStatuses.keys());
+    const uncalledVendors = businesses.filter(b => !calledIds.includes(b.id));
+
+    if (uncalledVendors.length === 0) {
+      addMessage("assistant", "All available vendors have been called. Click **Start New Search** to find more vendors.");
+      return;
+    }
+
+    // Get the best price so far to use as leverage
+    const completedCalls = Array.from(callStatuses.values()).filter(
+      (c) => c.status === "completed" && c.quote?.price
+    );
+    const bestPriceSoFar = completedCalls.length > 0
+      ? Math.min(...completedCalls.map(c => c.quote?.price || Infinity))
+      : null;
+
+    // Set the next vendor index and continue calling
+    const nextVendorIndex = calledIds.length;
+    setCurrentCallVendorIndex(nextVendorIndex);
+
+    const vendorsToCall = Math.min(3, uncalledVendors.length);
+    addMessage(
+      "assistant",
+      `📞 **Calling ${vendorsToCall} More Vendors**\n\n${bestPriceSoFar ? `Current best price: ₹${bestPriceSoFar.toLocaleString()} - I'll use this as leverage!` : ""}\n\nContinuing negotiations with additional vendors...`
+    );
+
+    // Start calling the next vendor
+    handleCallSingleVendor(nextVendorIndex);
+  };
+
+  // Check how many more vendors are available to call
+  const getUncalledVendorsCount = () => {
+    const calledIds = Array.from(callStatuses.keys());
+    return businesses.filter(b => !calledIds.includes(b.id)).length;
+  };
+
   // Handler for accepting prompt changes
   const handleAcceptPromptChanges = (newPrompt: string, appliedChanges: string[]) => {
     const updatedStore = addPromptVersion(
@@ -1740,25 +1779,55 @@ What can I help you find today?`,
 
           {/* Input */}
           <form onSubmit={handleSubmit} className="p-4 bg-white border-t">
-            <div className="flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
-                disabled={isLoading || stage === "researching" || stage === "calling"}
-                autoFocus
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white text-gray-900 placeholder-gray-500"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isLoading || stage === "researching" || stage === "calling"}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                Send
-              </button>
-            </div>
+            {stage === "results" ? (
+              /* Show action buttons when calls are complete */
+              <div className="flex flex-col gap-2">
+                {getUncalledVendorsCount() > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleCallMoreVendors}
+                    className="w-full px-6 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>📞</span> Call More Vendors ({getUncalledVendorsCount()} available)
+                  </button>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>🔄</span> Start New Search
+                  </button>
+                  <Link
+                    href="/history"
+                    className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>📋</span> View History
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Type your message..."
+                  disabled={isLoading || stage === "researching" || stage === "calling"}
+                  autoFocus
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 bg-white text-gray-900 placeholder-gray-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isLoading || stage === "researching" || stage === "calling"}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  Send
+                </button>
+              </div>
+            )}
           </form>
         </div>
 

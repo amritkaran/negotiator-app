@@ -19,7 +19,8 @@ interface VapiCallResponse {
 function createNegotiationPrompt(
   requirements: UserRequirement,
   business: Business,
-  lowestPriceSoFar?: number
+  lowestPriceSoFar?: number,
+  language?: string
 ): string {
   const context: NegotiationPromptContext = {
     agentName: "Preet",
@@ -36,27 +37,35 @@ function createNegotiationPrompt(
     tollPreference: requirements.tollPreference,
     specialInstructions: requirements.specialInstructions,
     lowestPriceSoFar,
-    language: "hindi", // VAPI voice bot uses Hindi by default
+    language: language || "hindi", // Use specified language or default to Hindi
     hitlMode: "tool", // VAPI uses the askHumanForDetails tool
   };
 
   return buildNegotiationPrompt(context);
 }
 
-// Create the first message for the call (in Hinglish)
-function createFirstMessage(requirements: UserRequirement, businessName: string): string {
-  return `Hello! Main Preet bol rahi hoon. Kya meri baat ${businessName} se ho rahi hai?`;
-}
-
 // Azure Neural TTS voice mappings for Indian languages
-const AZURE_VOICE_MAP: Record<string, { voiceId: string; languageCode: string }> = {
-  hi: { voiceId: "hi-IN-SwaraNeural", languageCode: "hi-IN" },
-  kn: { voiceId: "kn-IN-SapnaNeural", languageCode: "kn-IN" },
-  te: { voiceId: "te-IN-ShrutiNeural", languageCode: "te-IN" },
-  ta: { voiceId: "ta-IN-PallaviNeural", languageCode: "ta-IN" },
-  bn: { voiceId: "bn-IN-TanishaaNeural", languageCode: "bn-IN" },
-  mr: { voiceId: "mr-IN-AarohiNeural", languageCode: "mr-IN" },
-  gu: { voiceId: "gu-IN-DhwaniNeural", languageCode: "gu-IN" },
+// transcribeLang uses VAPI's Google transcriber language names
+// langName is the full language name for prompts
+const AZURE_VOICE_MAP: Record<string, { voiceId: string; transcribeLang: string; langName: string }> = {
+  hi: { voiceId: "hi-IN-SwaraNeural", transcribeLang: "Hindi", langName: "Hindi" },
+  kn: { voiceId: "kn-IN-SapnaNeural", transcribeLang: "Hindi", langName: "Kannada" }, // STT fallback to Hindi
+  te: { voiceId: "te-IN-ShrutiNeural", transcribeLang: "Hindi", langName: "Telugu" }, // STT fallback to Hindi
+  ta: { voiceId: "ta-IN-PallaviNeural", transcribeLang: "Hindi", langName: "Tamil" }, // STT fallback to Hindi
+  bn: { voiceId: "bn-IN-TanishaaNeural", transcribeLang: "Bengali", langName: "Bengali" },
+  mr: { voiceId: "mr-IN-AarohiNeural", transcribeLang: "Hindi", langName: "Marathi" }, // STT fallback to Hindi
+  gu: { voiceId: "gu-IN-DhwaniNeural", transcribeLang: "Hindi", langName: "Gujarati" }, // STT fallback to Hindi
+};
+
+// First messages in different Indian languages
+const FIRST_MESSAGES: Record<string, (businessName: string) => string> = {
+  hi: (name) => `Hello! Main Preet bol rahi hoon. Kya meri baat ${name} se ho rahi hai?`,
+  kn: (name) => `Hello! Naanu Preet. Naanu ${name} jote maathaadthiddina?`,
+  te: (name) => `Hello! Nenu Preet. Nenu ${name} tho maatlaadutunnana?`,
+  ta: (name) => `Hello! Naan Preet pesuren. Naan ${name} kitta pesurena?`,
+  bn: (name) => `Hello! Ami Preet bolchi. Ami ki ${name} er sathe kotha bolchi?`,
+  mr: (name) => `Hello! Mi Preet bolte. Mi ${name} shi bolte ka?`,
+  gu: (name) => `Hello! Hu Preet bolu chhu. Hu ${name} sathe vaat karu chhu?`,
 };
 
 export async function makeOutboundCall(
@@ -66,21 +75,29 @@ export async function makeOutboundCall(
   useRegionalLanguages?: boolean,
   regionalLanguage?: string
 ): Promise<{ callId: string; status: string }> {
-  const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar);
-  const firstMessage = createFirstMessage(requirements, business.name);
-
   // Get Azure voice config for selected regional language
   const selectedLang = regionalLanguage || "hi";
   const azureConfig = AZURE_VOICE_MAP[selectedLang] || AZURE_VOICE_MAP.hi;
 
+  // Determine language for prompts - use regional language name if regional mode, else Hindi
+  const promptLanguage = useRegionalLanguages ? azureConfig.langName.toLowerCase() : "hindi";
+
+  const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar, promptLanguage);
+
+  // Use language-specific first message for regional languages, default Hindi otherwise
+  const firstMessageFn = useRegionalLanguages
+    ? (FIRST_MESSAGES[selectedLang] || FIRST_MESSAGES.hi)
+    : FIRST_MESSAGES.hi;
+  const firstMessage = firstMessageFn(business.name.slice(0, 30)); // Truncate for readability
+
   // Configure transcriber based on language mode
   // - Hindi/English mode: Deepgram Nova-3 with "multi" (faster, code-switching)
-  // - Regional mode: Google STT with specific language code
+  // - Regional mode: Google STT with specific language (uses Gemini model)
   const transcriber = useRegionalLanguages
     ? {
         provider: "google" as const,
-        model: "latest_long" as const,
-        languageCode: azureConfig.languageCode,
+        model: "gemini-2.0-flash" as const,
+        language: azureConfig.transcribeLang,
       }
     : {
         provider: "deepgram" as const,
@@ -135,7 +152,7 @@ export async function makeOutboundCall(
       phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID, // Your Vapi phone number ID
       customer: {
         number: phoneNumber,
-        name: business.name,
+        name: business.name.slice(0, 40), // VAPI requires name <= 40 chars
       },
       assistant: {
         // Server URL for receiving webhooks (HITL tool calls)

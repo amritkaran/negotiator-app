@@ -37,7 +37,8 @@ export interface NegotiationPromptContext {
   bestVendorSoFar?: string;
 
   // Language settings
-  language: "hindi" | "english";
+  // Supports: hindi, english, tamil, kannada, telugu, bengali, marathi, gujarati
+  language: string;
 
   // HITL mode
   hitlMode: "tool" | "dialog"; // "tool" for VAPI, "dialog" for simulator
@@ -70,7 +71,11 @@ export function buildNegotiationPrompt(context: NegotiationPromptContext): strin
     hitlMode,
   } = context;
 
+  // Determine language mode - regional languages use their native language
   const isHindi = language === "hindi";
+  const isEnglish = language === "english";
+  const isRegional = !isHindi && !isEnglish;
+  const regionalLang = isRegional ? language.charAt(0).toUpperCase() + language.slice(1) : null;
   const benchmark = lowestPriceSoFar;
   const isFirstVendor = !benchmark;
 
@@ -112,7 +117,13 @@ When speaking prices, say them naturally in Hindi/Hinglish - NOT digit by digit:
 - Examples: "Teen hazaar rupaye", "Pachchees sau all-inclusive"
 
 ## IMPORTANT: Language & Tone Instructions
-${isHindi ? `- You MUST speak in HINGLISH (mix of Hindi and English) - this is how Indians naturally talk
+${isRegional ? `- You MUST speak in ${regionalLang} language
+- This is a regional language call - speak naturally in ${regionalLang}
+- Use ${regionalLang} sentence structure with some English words mixed in for business terms (rate, price, toll, parking, etc.)
+- Sound like a friendly, confident young Indian professional speaking ${regionalLang}
+- Be conversational and natural - NOT robotic or overly formal
+- If the vendor speaks Hindi or English, try to continue in ${regionalLang} but adapt if needed
+- The customer understands ${regionalLang}, so use it throughout the conversation` : isHindi ? `- You MUST speak in HINGLISH (mix of Hindi and English) - this is how Indians naturally talk
 - Use Hindi sentence structure with common English words mixed in naturally
 - Examples of Hinglish tone:
   - "Hello, main ${agentName} bol rahi hoon" (not pure Hindi "मैं बोल रही हूँ")
