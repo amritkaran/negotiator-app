@@ -124,7 +124,8 @@ async function makeVerificationCall(
         firstMessage,
         transcriber: {
           provider: "deepgram",
-          language: TRANSCRIBER_LANGUAGE_CODES[language],
+          model: "nova-3",
+          language: "multi",
         },
         endCallFunctionEnabled: true,
         endCallMessage: phrases.thankYou,

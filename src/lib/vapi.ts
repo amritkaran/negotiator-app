@@ -140,8 +140,8 @@ export async function makeOutboundCall(
         firstMessage: firstMessage,
         transcriber: {
           provider: "deepgram",
-          model: "nova-2",
-          language: "hi", // Hindi language detection
+          model: "nova-3",
+          language: "multi", // Multilingual detection
         },
         endCallFunctionEnabled: true,
         endCallMessage: "धन्यवाद, शुभ दिन!",

@@ -201,7 +201,8 @@ async function makeVapiCall(
         firstMessage: firstMessage,
         transcriber: {
           provider: "deepgram",
-          language: TRANSCRIBER_LANGUAGE_CODES[language],
+          model: "nova-3",
+          language: "multi",
         },
         endCallFunctionEnabled: true,
         endCallMessage: LANGUAGE_PHRASES[language].thankYou + ", " + LANGUAGE_PHRASES[language].willCallBack,
