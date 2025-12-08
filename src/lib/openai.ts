@@ -1,82 +1,129 @@
 import OpenAI from "openai";
 import { UserRequirement } from "@/types";
+import {
+  getServiceConfig,
+  detectServiceType,
+  buildExtractionPrompt,
+  getAvailableServices,
+  ServiceConfig,
+} from "./services/service-config";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const REQUIREMENT_EXTRACTION_PROMPT = `You are a helpful assistant that extracts structured requirements from user messages for booking local services.
+// Initial prompt to detect service type
+const SERVICE_DETECTION_PROMPT = `You are a helpful service booking assistant.
+Your first job is to understand what service the customer needs.
 
-Your job is to:
-1. Extract all relevant details from the conversation
-2. Identify what information is still missing
-3. Ask clarifying questions naturally - ONE question at a time
+Available services:
+- cab/taxi: For travel, rides, airport transfers, outstation trips
+- caterer/catering: For food, party catering, event food, tiffin services
+- photographer/photography: For photo shoots, video, wedding photography, events
 
-For CAB/TAXI services, you MUST collect these REQUIRED fields (in this priority order):
-1. Pickup location (from) - REQUIRED
-2. Drop location (to) - REQUIRED
-3. Date of travel - REQUIRED
-4. Time of travel - REQUIRED
-5. Trip type (one-way or round-trip/up-and-down) - REQUIRED, always ask this
-6. Waiting time (REQUIRED if round-trip) - how long should driver wait at destination
-7. Toll preference - REQUIRED, ask if user is okay with toll roads (they may make the trip shorter/faster)
-8. Number of passengers - REQUIRED
-9. Special instructions - REQUIRED, always ask if there's anything specific to tell the vendor (e.g., luggage, elderly passenger, AC preference, etc.)
-
-Optional fields:
-- Vehicle preference (sedan, SUV, auto)
-- Budget
-- Preferred vendors - IMPORTANT: Look for ANY vendor/company/service names the user mentions wanting to use or try first. Examples:
-  - "try Ola first" → preferredVendors: ["Ola"]
-  - "call Sharma Travels" → preferredVendors: ["Sharma Travels"]
-  - "prioritize XYZ Cabs and ABC Taxi" → preferredVendors: ["XYZ Cabs", "ABC Taxi"]
-  - "I want to book with Uber" → preferredVendors: ["Uber"]
-  - "Check with Meru first" → preferredVendors: ["Meru"]
-  Extract vendor names even if they're mentioned casually in the conversation.
-
-IMPORTANT RULES:
-- Ask ONE question at a time, don't overwhelm with multiple questions
-- For trip type, use natural phrasing like "Is this a one-way trip or do you need the cab to wait and bring you back?"
-- For toll preference, ask "Are you okay with toll roads if they make the journey shorter?"
-- For special instructions, ask "Any special requests or instructions for the driver? (luggage, AC preference, etc.)"
-- Only mark isComplete=true when ALL required fields are collected
-- If user says "no" or "nothing" for special instructions, that's valid - set it to "none"
+From the conversation, determine which service the customer needs.
+If unclear, ask them what service they're looking for.
 
 Respond in JSON format:
 {
-  "extracted": {
-    "service": "cab",
-    "from": "extracted pickup location or null",
-    "to": "extracted destination or null",
-    "date": "extracted date or null",
-    "time": "extracted time or null",
-    "passengers": number or null,
-    "vehicleType": "sedan/suv/auto or null",
-    "budget": number or null,
-    "tripType": "one-way or round-trip or null",
-    "waitingTime": number in minutes or null (only for round-trip),
-    "tollPreference": "ok/avoid/no-preference or null",
-    "specialInstructions": "any special instructions or 'none' or null",
-    "preferredVendors": ["array of vendor names user wants to call first"] or null,
-    "additionalDetails": "any other relevant info"
-  },
-  "isComplete": boolean,
-  "missingFields": ["list of missing required fields"],
-  "followUpQuestion": "Natural question to ask for missing info, or null if complete"
-}
+  "detectedService": "cab" or "caterer" or "photographer" or null,
+  "confidence": "high" or "medium" or "low",
+  "followUpQuestion": "Question to ask if service unclear, or null if clear"
+}`;
 
-Be conversational and friendly. If the user provides partial info, acknowledge what you understood and ask for ONE missing field.`;
-
-export async function extractRequirements(
+/**
+ * Detect service type from conversation
+ */
+export async function detectService(
   conversationHistory: { role: "user" | "assistant"; content: string }[]
-): Promise<{
-  requirements: UserRequirement;
-  followUpQuestion: string | null;
-}> {
+): Promise<{ service: string | null; followUpQuestion: string | null }> {
+  // First try keyword detection
+  const lastUserMessage = conversationHistory.filter((m) => m.role === "user").pop();
+  if (lastUserMessage) {
+    const detected = detectServiceType(lastUserMessage.content);
+    if (detected) {
+      return { service: detected, followUpQuestion: null };
+    }
+  }
+
+  // Use LLM for more complex detection
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
-      { role: "system", content: REQUIREMENT_EXTRACTION_PROMPT },
+      { role: "system", content: SERVICE_DETECTION_PROMPT },
+      ...conversationHistory.map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      })),
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
+  });
+
+  const result = JSON.parse(response.choices[0].message.content || "{}");
+
+  if (result.detectedService && result.confidence !== "low") {
+    return { service: result.detectedService, followUpQuestion: null };
+  }
+
+  return {
+    service: null,
+    followUpQuestion:
+      result.followUpQuestion ||
+      "What service are you looking for? I can help with cab booking, catering, or photography.",
+  };
+}
+
+/**
+ * Extract requirements using the dynamic service config
+ */
+export async function extractRequirements(
+  conversationHistory: { role: "user" | "assistant"; content: string }[],
+  serviceType?: string
+): Promise<{
+  requirements: UserRequirement;
+  followUpQuestion: string | null;
+  serviceConfig: ServiceConfig | null;
+}> {
+  // Detect service if not provided
+  let detectedService = serviceType;
+  if (!detectedService) {
+    for (const msg of conversationHistory) {
+      if (msg.role === "user") {
+        const detected = detectServiceType(msg.content);
+        if (detected) {
+          detectedService = detected;
+          break;
+        }
+      }
+    }
+  }
+
+  // Get service config
+  const serviceConfig = detectedService ? getServiceConfig(detectedService) : null;
+
+  // If no service detected yet, ask what service they need
+  if (!serviceConfig) {
+    const services = getAvailableServices();
+    const serviceList = services.map((s) => `${s.icon} ${s.displayName}`).join(", ");
+    return {
+      requirements: {
+        service: "",
+        isComplete: false,
+        missingFields: ["service"],
+      },
+      followUpQuestion: `Hello! What service do you need today? I can help with: ${serviceList}`,
+      serviceConfig: null,
+    };
+  }
+
+  // Build dynamic prompt based on service
+  const extractionPrompt = buildExtractionPrompt(serviceConfig);
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: extractionPrompt },
       ...conversationHistory.map((msg) => ({
         role: msg.role as "user" | "assistant",
         content: msg.content,
@@ -88,29 +135,55 @@ export async function extractRequirements(
 
   const result = JSON.parse(response.choices[0].message.content || "{}");
 
-  console.log(`[extractRequirements] Raw extraction result:`, JSON.stringify(result, null, 2));
-  console.log(`[extractRequirements] preferredVendors from GPT:`, result.extracted?.preferredVendors);
+  console.log(`[extractRequirements] Service: ${serviceConfig.id}`);
+  console.log(`[extractRequirements] Raw extraction:`, JSON.stringify(result, null, 2));
+
+  // Build requirements object with all extracted fields
+  const requirements: UserRequirement = {
+    service: serviceConfig.id,
+    isComplete: result.isComplete || false,
+    missingFields: result.missingFields || [],
+    // Common fields
+    preferredVendors: result.extracted?.preferredVendors || undefined,
+    additionalDetails: result.extracted?.additionalDetails || undefined,
+    budget: result.extracted?.budget || undefined,
+    // Store all service-specific fields in serviceFields
+    serviceFields: {},
+  };
+
+  // Copy all extracted fields
+  if (result.extracted) {
+    for (const [key, value] of Object.entries(result.extracted)) {
+      if (value !== null && value !== undefined) {
+        // Map to known fields or store in serviceFields
+        if (key in requirements) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (requirements as any)[key] = value;
+        } else {
+          requirements.serviceFields![key] = value;
+        }
+      }
+    }
+  }
+
+  // Also map common cab fields for backward compatibility
+  if (serviceConfig.id === "cab") {
+    requirements.from = result.extracted?.from || undefined;
+    requirements.to = result.extracted?.to || undefined;
+    requirements.date = result.extracted?.date || undefined;
+    requirements.time = result.extracted?.time || undefined;
+    requirements.passengers = result.extracted?.passengers || undefined;
+    requirements.vehicleType = result.extracted?.vehicleType || undefined;
+    requirements.tripType = result.extracted?.tripType || undefined;
+    requirements.waitingTime = result.extracted?.waitingTime || undefined;
+    requirements.tollPreference = result.extracted?.tollPreference || undefined;
+    requirements.specialInstructions = result.extracted?.specialInstructions || undefined;
+  }
 
   return {
-    requirements: {
-      service: result.extracted?.service || "cab",
-      from: result.extracted?.from || undefined,
-      to: result.extracted?.to || undefined,
-      date: result.extracted?.date || undefined,
-      time: result.extracted?.time || undefined,
-      passengers: result.extracted?.passengers || undefined,
-      vehicleType: result.extracted?.vehicleType || undefined,
-      budget: result.extracted?.budget || undefined,
-      tripType: result.extracted?.tripType || undefined,
-      waitingTime: result.extracted?.waitingTime || undefined,
-      tollPreference: result.extracted?.tollPreference || undefined,
-      specialInstructions: result.extracted?.specialInstructions || undefined,
-      preferredVendors: result.extracted?.preferredVendors || undefined,
-      additionalDetails: result.extracted?.additionalDetails || undefined,
-      isComplete: result.isComplete || false,
-      missingFields: result.missingFields || [],
-    },
+    requirements,
     followUpQuestion: result.followUpQuestion || null,
+    serviceConfig,
   };
 }
 

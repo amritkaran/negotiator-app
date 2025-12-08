@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractRequirements } from "@/lib/openai";
 import { UserRequirement } from "@/types";
 import { logRequirements, logError } from "@/lib/session-logger";
+import { getServiceConfig, ServiceConfig } from "@/lib/services/service-config";
 
 // Store conversation state in memory (use Redis/DB in production)
 const conversations = new Map<
@@ -9,8 +10,64 @@ const conversations = new Map<
   {
     history: { role: "user" | "assistant"; content: string }[];
     requirements: UserRequirement | null;
+    serviceType: string | null;
   }
 >();
+
+/**
+ * Build a dynamic completion message based on service type and requirements
+ */
+function buildCompletionMessage(requirements: UserRequirement, serviceConfig: ServiceConfig): string {
+  const lines: string[] = [`${serviceConfig.completionMessage}\n\n**Your ${serviceConfig.displayName} Request:**`];
+
+  // Add service icon and type
+  lines.push(`- ${serviceConfig.icon} Service: ${serviceConfig.displayName}`);
+
+  // Add all required fields that have values
+  for (const field of serviceConfig.requiredFields) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reqAny = requirements as any;
+    const value = reqAny[field.name] ?? requirements.serviceFields?.[field.name];
+
+    if (value !== null && value !== undefined && value !== "") {
+      let displayValue = String(value);
+
+      // Format special values
+      if (field.name === "tripType") {
+        displayValue = value === "round-trip" ? "Round trip (up and down)" : "One way";
+      } else if (field.name === "tollPreference") {
+        displayValue = value === "ok" ? "OK to use" : value === "avoid" ? "Avoid if possible" : "No preference";
+      } else if (field.name === "foodType") {
+        displayValue = value === "veg" ? "Vegetarian" : value === "non-veg" ? "Non-Vegetarian" : "Both Veg & Non-Veg";
+      } else if (field.name === "photoVideo") {
+        displayValue = value === "photo-only" ? "Photos Only" : value === "video-only" ? "Video Only" : "Photos + Video";
+      }
+
+      lines.push(`- ${field.displayName}: ${displayValue}`);
+    }
+  }
+
+  // Add optional fields if they have values
+  for (const field of serviceConfig.optionalFields) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reqAny = requirements as any;
+    const value = reqAny[field.name] ?? requirements.serviceFields?.[field.name];
+
+    if (value !== null && value !== undefined && value !== "" && value !== "none") {
+      if (field.name === "preferredVendors" && Array.isArray(value) && value.length > 0) {
+        lines.push(`- **Preferred Vendors:** ${value.join(", ")} (will be prioritized)`);
+      } else if (field.name === "budget") {
+        lines.push(`- Budget: ₹${value}`);
+      } else {
+        lines.push(`- ${field.displayName}: ${value}`);
+      }
+    }
+  }
+
+  lines.push(`\nClick "Find Providers" to search for the best ${serviceConfig.displayName.toLowerCase()} providers near you!`);
+
+  return lines.join("\n");
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -33,41 +90,31 @@ export async function POST(request: NextRequest) {
     // Get or create conversation
     let conversation = conversations.get(sessionId);
     if (!conversation) {
-      conversation = { history: [], requirements: null };
+      conversation = { history: [], requirements: null, serviceType: null };
       conversations.set(sessionId, conversation);
     }
 
     // Add user message to history
     conversation.history.push({ role: "user", content: message });
 
-    // Extract requirements from conversation
-    const { requirements, followUpQuestion } = await extractRequirements(
-      conversation.history
+    // Extract requirements from conversation (pass existing service type if known)
+    const { requirements, followUpQuestion, serviceConfig } = await extractRequirements(
+      conversation.history,
+      conversation.serviceType || undefined
     );
+
+    // Store detected service type for future messages
+    if (serviceConfig && !conversation.serviceType) {
+      conversation.serviceType = serviceConfig.id;
+    }
 
     conversation.requirements = requirements;
 
     let response: string;
 
-    if (requirements.isComplete) {
-      response = `Perfect! I have all the details:
-
-**Your Request:**
-- Service: ${requirements.service}
-- From: ${requirements.from}
-- To: ${requirements.to}
-- Date: ${requirements.date}
-- Time: ${requirements.time}
-- Trip Type: ${requirements.tripType === "round-trip" ? "Round trip (up and down)" : "One way"}
-${requirements.tripType === "round-trip" && requirements.waitingTime ? `- Waiting Time: ${requirements.waitingTime} minutes` : ""}
-- Toll Roads: ${requirements.tollPreference === "ok" ? "OK to use" : requirements.tollPreference === "avoid" ? "Avoid if possible" : "No preference"}
-${requirements.passengers ? `- Passengers: ${requirements.passengers}` : ""}
-${requirements.vehicleType ? `- Vehicle: ${requirements.vehicleType}` : ""}
-${requirements.specialInstructions && requirements.specialInstructions !== "none" ? `- Special Instructions: ${requirements.specialInstructions}` : ""}
-${requirements.budget ? `- Budget: ₹${requirements.budget}` : ""}
-${requirements.preferredVendors && requirements.preferredVendors.length > 0 ? `- **Preferred Vendors:** ${requirements.preferredVendors.join(", ")} (will be prioritized)` : ""}
-
-Click "Find Providers" to search for the best service providers near you!`;
+    if (requirements.isComplete && serviceConfig) {
+      // Build dynamic completion message based on service type
+      response = buildCompletionMessage(requirements, serviceConfig);
     } else {
       response = followUpQuestion || "Could you provide more details about what you need?";
     }
@@ -77,7 +124,7 @@ Click "Find Providers" to search for the best service providers near you!`;
 
     // Log requirements if complete
     if (requirements.isComplete) {
-      console.log(`[chat] Requirements complete - preferredVendors:`, requirements.preferredVendors);
+      console.log(`[chat] Requirements complete for ${requirements.service}:`, requirements);
       try {
         await logRequirements(sessionId, {
           service: requirements.service,
@@ -92,6 +139,7 @@ Click "Find Providers" to search for the best service providers near you!`;
           tollPreference: requirements.tollPreference,
           specialInstructions: requirements.specialInstructions,
           preferredVendors: requirements.preferredVendors,
+          serviceFields: requirements.serviceFields,
         });
       } catch {
         // Ignore logging errors
@@ -104,6 +152,7 @@ Click "Find Providers" to search for the best service providers near you!`;
       response,
       requirements,
       isComplete: requirements.isComplete,
+      serviceType: serviceConfig?.id || null,
     });
   } catch (error) {
     console.error("[chat] Error:", error);

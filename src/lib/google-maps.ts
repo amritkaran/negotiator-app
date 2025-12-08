@@ -1,4 +1,5 @@
 import { Business } from "@/types";
+import { getServiceConfig } from "./services/service-config";
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
@@ -34,13 +35,23 @@ interface PlaceDetailsResponse {
 }
 
 // Convert service type to Google Maps search query
+// Uses service config for dynamic services, falls back to static map
 function getSearchQuery(service: string): string {
+  // Try to get from service config first
+  const serviceConfig = getServiceConfig(service);
+  if (serviceConfig && serviceConfig.googleSearchTerms.length > 0) {
+    // Return the first search term (primary)
+    return serviceConfig.googleSearchTerms[0];
+  }
+
+  // Fallback to static map for services not in config
   const serviceMap: Record<string, string> = {
     cab: "taxi service",
     taxi: "taxi service",
     plumber: "plumber",
     electrician: "electrician",
     caterer: "catering service",
+    photographer: "photographer",
     carpenter: "carpenter",
     painter: "painter",
     cleaning: "cleaning service",

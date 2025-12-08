@@ -25,6 +25,8 @@ export interface SessionLog {
     tollPreference?: "ok" | "avoid" | "no-preference";
     specialInstructions?: string;
     preferredVendors?: string[];
+    // Dynamic service-specific fields (caterer, photographer, etc.)
+    serviceFields?: Record<string, unknown>;
   };
   research?: {
     businessesFound: number;
