@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { getEndedReasonDisplay } from "@/lib/ended-reason-display";
 
 interface CallHistoryRecord {
   id: string;
@@ -10,6 +11,7 @@ interface CallHistoryRecord {
   dateTime: string;
   duration: number;
   status: "completed" | "no_answer" | "busy" | "rejected" | "failed" | "in_progress";
+  endedReason: string | null;
   requirements: {
     service: string;
     from: string;
@@ -187,6 +189,9 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Reason
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Quote
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -234,6 +239,23 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                         >
                           {statusDisplay.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {record.endedReason ? (
+                          (() => {
+                            const reasonDisplay = getEndedReasonDisplay(record.endedReason);
+                            return (
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${reasonDisplay.color}`}
+                                title={reasonDisplay.description}
+                              >
+                                {reasonDisplay.icon} {reasonDisplay.label}
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="text-gray-400 text-xs">--</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {record.quotedPrice ? (
@@ -314,7 +336,7 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                     {/* Expanded Details Row */}
                     {isExpanded && (
                       <tr key={`${record.id}-details`}>
-                        <td colSpan={6} className="px-4 py-4 bg-gray-50">
+                        <td colSpan={7} className="px-4 py-4 bg-gray-50">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Requirements Summary */}
                             <div>
@@ -405,6 +427,20 @@ export default function CallHistory({ refreshTrigger }: CallHistoryProps) {
                                   <p>
                                     <span className="text-gray-500">Notes:</span>{" "}
                                     <span className="text-gray-800">{record.notes}</span>
+                                  </p>
+                                )}
+                                {record.endedReason && (
+                                  <p>
+                                    <span className="text-gray-500">Call Ended:</span>{" "}
+                                    {(() => {
+                                      const reasonDisplay = getEndedReasonDisplay(record.endedReason);
+                                      return (
+                                        <span className={`inline-flex items-center gap-1 ${reasonDisplay.color.replace('bg-', 'text-').replace('-100', '-700')}`}>
+                                          {reasonDisplay.icon} {reasonDisplay.label}
+                                          <span className="text-gray-500 font-normal"> - {reasonDisplay.description}</span>
+                                        </span>
+                                      );
+                                    })()}
                                   </p>
                                 )}
                               </div>
