@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { message } = body;
+    const { message, history: clientHistory } = body;
     sessionId = body.sessionId || "unknown";
 
     console.log(`[chat] Processing message for session ${sessionId}`);
@@ -87,11 +87,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create conversation
+    // Get or create conversation - prefer client history (serverless is stateless)
     let conversation = conversations.get(sessionId);
     if (!conversation) {
       conversation = { history: [], requirements: null, serviceType: null };
       conversations.set(sessionId, conversation);
+    }
+
+    // Use client-provided history if available (for serverless compatibility)
+    // This ensures conversation state survives across different function instances
+    if (clientHistory && Array.isArray(clientHistory) && clientHistory.length > 0) {
+      conversation.history = clientHistory;
     }
 
     // Add user message to history

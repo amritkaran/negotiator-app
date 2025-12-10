@@ -594,10 +594,15 @@ What can I help you find today?`,
     addWorkflowEvent("started", "intake", "Processing user requirements");
 
     try {
+      // Build conversation history for the API (serverless functions are stateless)
+      const history = messages
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage, sessionId }),
+        body: JSON.stringify({ message: userMessage, sessionId, history }),
       });
 
       const data = await response.json();
