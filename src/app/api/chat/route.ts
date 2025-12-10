@@ -164,9 +164,21 @@ export async function POST(request: NextRequest) {
       // Ignore logging errors
     }
 
+    // Extract error message properly - handle nested error objects (e.g., OpenAI errors)
+    let errorMessage = "Failed to process message";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === "object" && error !== null) {
+      // Handle OpenAI-style errors with nested structure
+      const errObj = error as { message?: string; error?: { message?: string } };
+      errorMessage = errObj.message || errObj.error?.message || JSON.stringify(error);
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    }
+
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to process message",
+        error: errorMessage,
         details: process.env.NODE_ENV === "development" ? String(error) : undefined,
       },
       { status: 500 }

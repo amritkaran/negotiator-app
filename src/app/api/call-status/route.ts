@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCallStatus, extractQuoteFromTranscript } from "@/lib/vapi";
-import { getCallRecordByCallId, updateCallRecord } from "@/lib/call-history";
+import { getCallRecordByCallId, updateCallRecord, CallHistoryRecord } from "@/lib/call-history";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -34,13 +34,32 @@ export async function GET(request: NextRequest) {
         )
       : null;
 
+    // Determine status based on endedReason for more accurate tracking
+    let finalStatus: CallHistoryRecord["status"] = "completed";
+    if (callData.endedReason) {
+      if (callData.endedReason === "customer-busy") {
+        finalStatus = "busy";
+      } else if (
+        callData.endedReason === "customer-did-not-answer" ||
+        callData.endedReason === "voicemail"
+      ) {
+        finalStatus = "no_answer";
+      } else if (
+        callData.endedReason.includes("error") ||
+        callData.endedReason.includes("failed")
+      ) {
+        finalStatus = "failed";
+      }
+    }
+
     // Update call history record when call ends
     if (isEnded) {
       try {
         const existingRecord = await getCallRecordByCallId(callId);
         if (existingRecord) {
           await updateCallRecord(existingRecord.id, {
-            status: "completed",
+            status: finalStatus,
+            endedReason: callData.endedReason || null,
             duration: duration || 0,
             transcript: callData.transcript || null,
             recordingUrl: callData.recordingUrl || null,
@@ -56,6 +75,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       callId,
       status: callData.status,
+      endedReason: callData.endedReason || null,
       transcript: callData.transcript,
       summary: callData.summary,
       recordingUrl: callData.recordingUrl || null,

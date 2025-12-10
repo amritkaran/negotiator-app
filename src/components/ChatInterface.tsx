@@ -603,9 +603,13 @@ What can I help you find today?`,
       const data = await response.json();
 
       if (data.error) {
-        addMessage("assistant", `Sorry, something went wrong: ${data.error}`);
-        updateAgentState("intake", "error", data.error);
-        addWorkflowEvent("error", "intake", data.error);
+        // Ensure error is a string (handle object errors gracefully)
+        const errorMsg = typeof data.error === "string"
+          ? data.error
+          : (data.error.message || JSON.stringify(data.error));
+        addMessage("assistant", `Sorry, something went wrong: ${errorMsg}`);
+        updateAgentState("intake", "error", errorMsg);
+        addWorkflowEvent("error", "intake", errorMsg);
       } else {
         addMessage("assistant", data.response);
         if (data.requirements) {

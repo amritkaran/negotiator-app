@@ -12,6 +12,7 @@ export interface CallHistoryRecord {
   dateTime: string;
   duration: number;
   status: "completed" | "no_answer" | "busy" | "rejected" | "failed" | "in_progress";
+  endedReason: string | null; // VAPI detailed reason (e.g., "customer-ended-call", "voicemail")
 
   requirements: {
     service: string;
@@ -59,6 +60,7 @@ function rowToRecord(row: Record<string, unknown>): CallHistoryRecord {
       : String(row.date_time),
     duration: row.duration as number,
     status: row.status as CallHistoryRecord["status"],
+    endedReason: (row.ended_reason as string) || null,
     requirements: row.requirements as CallHistoryRecord["requirements"],
     quotedPrice: row.quoted_price ? Number(row.quoted_price) : null,
     negotiatedPrice: row.negotiated_price ? Number(row.negotiated_price) : null,
@@ -77,7 +79,7 @@ export async function saveCallRecord(
 
   const result = await sql`
     INSERT INTO call_history (
-      call_id, vendor_name, vendor_phone, date_time, duration, status,
+      call_id, vendor_name, vendor_phone, date_time, duration, status, ended_reason,
       requirements, quoted_price, negotiated_price, transcript, recording_url, notes, session_id
     ) VALUES (
       ${record.callId},
@@ -86,6 +88,7 @@ export async function saveCallRecord(
       ${record.dateTime},
       ${record.duration},
       ${record.status},
+      ${record.endedReason},
       ${JSON.stringify(record.requirements)},
       ${record.quotedPrice},
       ${record.negotiatedPrice},
@@ -113,6 +116,7 @@ export async function updateCallRecord(
     UPDATE call_history
     SET
       status = COALESCE(${updates.status ?? null}, status),
+      ended_reason = COALESCE(${updates.endedReason ?? null}, ended_reason),
       duration = COALESCE(${updates.duration ?? null}, duration),
       quoted_price = COALESCE(${updates.quotedPrice ?? null}, quoted_price),
       negotiated_price = COALESCE(${updates.negotiatedPrice ?? null}, negotiated_price),

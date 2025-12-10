@@ -9,6 +9,7 @@ interface VapiCallResponse {
   status: string;
   createdAt: string;
   endedAt?: string;
+  endedReason?: string; // Detailed reason why call ended (e.g., "customer-ended-call", "voicemail", "assistant-ended-call")
   transcript?: string;
   summary?: string;
   recordingUrl?: string;
@@ -367,11 +368,24 @@ export async function processCallResult(
     "no-answer": "no_answer",
   };
 
+  // Map endedReason to appropriate status if not already mapped
+  // Some endedReasons imply specific statuses
+  let status = statusMap[callResponse.status] || "failed";
+  if (callResponse.endedReason) {
+    if (callResponse.endedReason === "customer-busy") {
+      status = "busy";
+    } else if (callResponse.endedReason === "customer-did-not-answer") {
+      status = "no_answer";
+    } else if (callResponse.endedReason === "voicemail") {
+      status = "no_answer";
+    }
+  }
+
   return {
     businessId: business.id,
     businessName: business.name,
     phone: business.phone,
-    status: statusMap[callResponse.status] || "failed",
+    status,
     quotedPrice,
     notes: notes || callResponse.summary || "",
     transcript: callResponse.transcript,
@@ -383,5 +397,6 @@ export async function processCallResult(
         )
       : undefined,
     callId: callResponse.id,
+    endedReason: callResponse.endedReason,
   };
 }

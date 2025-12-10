@@ -59,6 +59,7 @@ export interface CallResult {
   duration?: number; // in seconds
   callId?: string;
   recordingUrl?: string; // VAPI call recording URL
+  endedReason?: string; // VAPI detailed reason (e.g., "customer-ended-call", "voicemail", "assistant-ended-call")
 }
 
 export interface Quote {

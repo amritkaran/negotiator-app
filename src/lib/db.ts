@@ -24,6 +24,7 @@ export async function initializeDatabase() {
         date_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
         duration INTEGER DEFAULT 0,
         status VARCHAR(50) NOT NULL DEFAULT 'in_progress',
+        ended_reason VARCHAR(100), -- VAPI detailed reason (e.g., "customer-ended-call", "voicemail")
 
         -- Requirements as JSON
         requirements JSONB,
@@ -42,6 +43,11 @@ export async function initializeDatabase() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
+    `;
+
+    // Add ended_reason column if it doesn't exist (for existing databases)
+    await sql`
+      ALTER TABLE call_history ADD COLUMN IF NOT EXISTS ended_reason VARCHAR(100);
     `;
 
     // Create index on call_id for faster lookups

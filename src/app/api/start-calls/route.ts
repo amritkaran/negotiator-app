@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
           dateTime: new Date().toISOString(),
           duration: 0,
           status: "in_progress",
+          endedReason: null, // Will be populated when call ends
           requirements: {
             service: reqs.service,
             from: reqs.from || "",
