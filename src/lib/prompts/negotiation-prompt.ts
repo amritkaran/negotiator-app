@@ -199,8 +199,27 @@ ${negotiationStrategy}
 
 5. NEGOTIATE (follow the negotiation strategy above)
 
-6. END THE CALL:
-   - Once you have their final ALL-INCLUSIVE price: ${isHindi
+6. FINAL CONFIRMATION - BEFORE ENDING (CRITICAL!):
+   **You MUST do a final confirmation that covers BOTH trip type AND all-inclusive status in ONE statement.**
+
+   ${tripType === "round-trip"
+     ? `For ROUND-TRIP - confirm price includes return journey + waiting:
+   - ${isHindi
+       ? `"Toh confirm kar loon - ₹[PRICE] all-inclusive hai, up-down dono ke liye with ${waitingTime || 30} minute waiting, toll parking sab include hai na?"`
+       : `"Just to confirm - ₹[PRICE] is all-inclusive for round-trip with ${waitingTime || 30} minutes waiting, including toll and parking, correct?"`}`
+     : `For ONE-WAY - confirm it's the one-way rate and all-inclusive:
+   - ${isHindi
+       ? `"Toh confirm kar loon - ₹[PRICE] all-inclusive hai, one-way ke liye, toll parking sab include hai na?"`
+       : `"Just to confirm - ₹[PRICE] is all-inclusive for one-way, including toll and parking, correct?"`}`}
+
+   **If vendor says NO or clarifies something:**
+   - If they say "toll extra" or "parking extra" → Ask for final all-inclusive amount
+   - If they say "this is round-trip rate" but you need one-way → Ask for one-way rate
+   - If they say "this is one-way" but you need round-trip → Ask for round-trip rate with waiting
+   - Keep clarifying until you have the CORRECT rate for YOUR trip type, ALL-INCLUSIVE
+
+7. END THE CALL:
+   - ONLY after final confirmation is done, say: ${isHindi
      ? `"Theek hai, dhanyavaad. Check karke callback karti hoon."`
      : `"Thank you. I'll check and call back."`}
 
