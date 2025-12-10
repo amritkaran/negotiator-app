@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       dateTime: body.dateTime || new Date().toISOString(),
       duration: body.duration || 0,
       status: body.status || "in_progress",
+      endedReason: body.endedReason || null,
       requirements: {
         service: body.requirements?.service || "cab",
         from: body.requirements?.from || "",
