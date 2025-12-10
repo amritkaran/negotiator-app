@@ -107,10 +107,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[learning-analysis] Starting analysis for ${results.length} results`);
 
-    // Use GPT-4o for reasoning
+    // Use OpenAI o1 for advanced reasoning
     const model = new ChatOpenAI({
-      modelName: "gpt-4o",
-      temperature: 0.3,
+      modelName: "o1",
+      temperature: 1, // o1 requires temperature=1
     });
 
     // Fetch full chat transcripts from the simulation store
