@@ -1035,7 +1035,7 @@ function buildAgentSystemPrompt(context: NegotiationContext): string {
     expectedPriceHigh: context.expectedPriceHigh,
     lowestPriceSoFar: context.lowestPriceSoFar || undefined,
     bestVendorSoFar: context.bestVendorSoFar || undefined,
-    language: "english", // Simulator uses English for text-based chat
+    language: "hindi", // Simulator uses Hindi (Hinglish) to match voice bot
     hitlMode: "dialog", // Simulator uses dialog-based HITL (shows [NEEDS USER INPUT] messages)
   };
 

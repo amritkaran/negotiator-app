@@ -18,7 +18,7 @@ const sessionLowestPrices = new Map<string, number>();
 
 export async function POST(request: NextRequest) {
   try {
-    const { businesses, requirements, sessionId, languageMode, regionalLanguage } = await request.json();
+    const { businesses, requirements, sessionId, languageMode, regionalLanguage, priceIntel } = await request.json();
 
     if (!businesses || !requirements || !sessionId) {
       return NextResponse.json(
@@ -34,6 +34,14 @@ export async function POST(request: NextRequest) {
 
     // Get existing lowest price for this session (if any)
     let lowestPriceSoFar = sessionLowestPrices.get(sessionId);
+
+    // Price context from research phase
+    const priceContext = priceIntel?.baselinePrice ? {
+      expectedPriceLow: priceIntel.baselinePrice.low,
+      expectedPriceMid: priceIntel.baselinePrice.mid,
+      expectedPriceHigh: priceIntel.baselinePrice.high,
+      bestVendorSoFar: undefined as string | undefined,
+    } : undefined;
 
     const results = [];
 
@@ -53,7 +61,8 @@ export async function POST(request: NextRequest) {
           requirements as UserRequirement,
           lowestPriceSoFar,
           useRegionalLanguages,
-          selectedRegionalLanguage
+          selectedRegionalLanguage,
+          priceContext
         );
 
         // Store call info

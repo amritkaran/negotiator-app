@@ -21,7 +21,13 @@ function createNegotiationPrompt(
   requirements: UserRequirement,
   business: Business,
   lowestPriceSoFar?: number,
-  language?: string
+  language?: string,
+  priceContext?: {
+    expectedPriceLow?: number;
+    expectedPriceMid?: number;
+    expectedPriceHigh?: number;
+    bestVendorSoFar?: string;
+  }
 ): string {
   const context: NegotiationPromptContext = {
     agentName: "Preet",
@@ -37,7 +43,11 @@ function createNegotiationPrompt(
     waitingTime: requirements.waitingTime,
     tollPreference: requirements.tollPreference,
     specialInstructions: requirements.specialInstructions,
+    expectedPriceLow: priceContext?.expectedPriceLow,
+    expectedPriceMid: priceContext?.expectedPriceMid,
+    expectedPriceHigh: priceContext?.expectedPriceHigh,
     lowestPriceSoFar,
+    bestVendorSoFar: priceContext?.bestVendorSoFar,
     language: language || "hindi", // Use specified language or default to Hindi
     hitlMode: "tool", // VAPI uses the askHumanForDetails tool
   };
@@ -74,7 +84,13 @@ export async function makeOutboundCall(
   requirements: UserRequirement,
   lowestPriceSoFar?: number,
   useRegionalLanguages?: boolean,
-  regionalLanguage?: string
+  regionalLanguage?: string,
+  priceContext?: {
+    expectedPriceLow?: number;
+    expectedPriceMid?: number;
+    expectedPriceHigh?: number;
+    bestVendorSoFar?: string;
+  }
 ): Promise<{ callId: string; status: string }> {
   // Get Azure voice config for selected regional language
   const selectedLang = regionalLanguage || "hi";
@@ -83,7 +99,7 @@ export async function makeOutboundCall(
   // Determine language for prompts - use regional language name if regional mode, else Hindi
   const promptLanguage = useRegionalLanguages ? azureConfig.langName.toLowerCase() : "hindi";
 
-  const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar, promptLanguage);
+  const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar, promptLanguage, priceContext);
 
   // Use language-specific first message for regional languages, default Hindi otherwise
   const firstMessageFn = useRegionalLanguages

@@ -845,6 +845,7 @@ What can I help you find today?`,
           sessionId,
           languageMode,
           regionalLanguage: languageMode === "regional" ? regionalLanguage : undefined,
+          priceIntel, // Pass price context for better negotiation
         }),
       });
 
