@@ -87,6 +87,26 @@ export async function POST(request: NextRequest) {
     const body: LearningRequest = await request.json();
     const { results, priceIntel, requirements } = body;
 
+    // Validate required data
+    if (!results || results.length === 0) {
+      console.error("[learning-analysis] No results provided");
+      return NextResponse.json(
+        { error: "No simulation results provided for analysis" },
+        { status: 400 }
+      );
+    }
+
+    // Check for OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("[learning-analysis] OPENAI_API_KEY not set");
+      return NextResponse.json(
+        { error: "OpenAI API key not configured" },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[learning-analysis] Starting analysis for ${results.length} results`);
+
     // Use GPT-4o for reasoning
     const model = new ChatOpenAI({
       modelName: "gpt-4o",
@@ -345,7 +365,13 @@ async function fetchTranscripts(
 
   // PRIORITY 2: Fetch from the simulate-negotiation API's debug endpoint for any missing vendors
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/simulate-negotiation`, {
+    // Determine base URL for internal API calls
+    // In Vercel: use VERCEL_URL, otherwise use NEXT_PUBLIC_BASE_URL or localhost
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+    const response = await fetch(`${baseUrl}/api/simulate-negotiation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "debug_all" }),
