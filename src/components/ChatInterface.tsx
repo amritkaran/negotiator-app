@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage as ChatMessageType, Business, UserRequirement } from "@/types";
 import { ChatMessage } from "./ChatMessage";
+import { BookingForm } from "./BookingForm";
 import { AgentWorkflowPanel, AgentState, WorkflowEvent, AgentStatus } from "./AgentWorkflowPanel";
 import { VendorSimulationPanel } from "./VendorSimulationPanel";
 import { LearningPanel } from "./LearningPanel";
@@ -70,6 +71,8 @@ interface LearningAnalysis {
 }
 
 type AppStage =
+  | "service_selection"
+  | "booking_form"
   | "chat"
   | "researching"
   | "businesses_found"
@@ -454,7 +457,8 @@ What can I help you find today?`,
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [stage, setStage] = useState<AppStage>("chat");
+  const [stage, setStage] = useState<AppStage>("service_selection");
+  const [selectedService, setSelectedService] = useState<string | null>(null);
   const [requirements, setRequirements] = useState<UserRequirement | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [callStatuses, setCallStatuses] = useState<Map<string, CallStatus>>(new Map());
@@ -1538,7 +1542,8 @@ What can I help you find today?`,
         timestamp: new Date(),
       },
     ]);
-    setStage("chat");
+    setStage("service_selection");
+    setSelectedService(null);
     setRequirements(null);
     setBusinesses([]);
     setRankedBusinesses([]);
@@ -1567,6 +1572,36 @@ What can I help you find today?`,
     // Reset performance state (keep the store but clear current metrics)
     setCurrentSimMetrics(null);
     setShowPromptReview(false);
+  };
+
+  // Handler for service selection
+  const handleServiceSelection = (service: string) => {
+    setSelectedService(service);
+    if (service === "cab") {
+      // For cab service, show the booking form with map
+      setStage("booking_form");
+      addMessage("assistant", "Great! Let's book a cab. Please fill in your trip details below.");
+    } else {
+      // For other services, use chat-based intake
+      setStage("chat");
+      addMessage("assistant", `I'll help you find the best ${service} services. Tell me more about what you need - date, location, any specific requirements?`);
+    }
+  };
+
+  // Handler for booking form submission
+  const handleBookingFormSubmit = (formRequirements: UserRequirement) => {
+    setRequirements(formRequirements);
+    setStage("chat");
+    addMessage("user", `I need a cab from ${formRequirements.from} to ${formRequirements.to} on ${formRequirements.date} at ${formRequirements.time}. ${formRequirements.tripType === "round-trip" ? "Round trip." : "One way."} ${formRequirements.passengers} passenger(s).`);
+    addMessage("assistant", `Perfect! I've got your trip details:
+
+**From:** ${formRequirements.from}
+**To:** ${formRequirements.to}
+**Date:** ${formRequirements.date} at ${formRequirements.time}
+**Trip:** ${formRequirements.tripType === "round-trip" ? "Round Trip" : "One Way"}
+**Passengers:** ${formRequirements.passengers}
+
+Click **Find Providers** to search for the best cab services in your area.`);
   };
 
   // Handler for calling more vendors (continue from where we left off)
@@ -1672,31 +1707,115 @@ What can I help you find today?`,
 
       {/* 3-Panel Layout */}
       <div className="flex-1 overflow-hidden flex">
-        {/* Panel 1: Chat */}
+        {/* Panel 1: Chat / Service Selection / Booking Form */}
         <div className="w-1/3 flex flex-col border-r bg-white shadow-sm">
           {/* Panel Header */}
           <div className="px-4 py-3 bg-gray-50 border-b">
             <h2 className="font-semibold text-gray-700 flex items-center gap-2">
-              <span>💬</span> Chat
+              {stage === "service_selection" ? (
+                <><span>🎯</span> Select Service</>
+              ) : stage === "booking_form" ? (
+                <><span>🚕</span> Book Your Ride</>
+              ) : (
+                <><span>💬</span> Chat</>
+              )}
             </h2>
           </div>
-          {/* Messages */}
+
+          {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-4">
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            {isLoading && (
-              <div className="flex justify-start mb-4">
-                <div className="bg-gray-100 rounded-2xl px-4 py-3 rounded-bl-md">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-                  </div>
+            {/* Service Selection */}
+            {stage === "service_selection" && (
+              <div className="space-y-4">
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">What do you need help with?</h3>
+                  <p className="text-sm text-gray-500">Select a service to get started</p>
+                </div>
+
+                <div className="grid gap-3">
+                  <button
+                    onClick={() => handleServiceSelection("cab")}
+                    className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-transparent hover:border-blue-400 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                      🚕
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold text-gray-800">Cab / Taxi</div>
+                      <div className="text-sm text-gray-500">Book outstation or local rides</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleServiceSelection("caterer")}
+                    className="flex items-center gap-4 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border-2 border-transparent hover:border-orange-400 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                      🍽️
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold text-gray-800">Caterer</div>
+                      <div className="text-sm text-gray-500">Events, parties & functions</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleServiceSelection("photographer")}
+                    className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border-2 border-transparent hover:border-purple-400 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                      📸
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold text-gray-800">Photographer</div>
+                      <div className="text-sm text-gray-500">Weddings, events & portraits</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleServiceSelection("other")}
+                    className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border-2 border-transparent hover:border-gray-400 transition-all group"
+                  >
+                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                      🔧
+                    </div>
+                    <div className="text-left">
+                      <div className="font-semibold text-gray-800">Other Service</div>
+                      <div className="text-sm text-gray-500">Plumber, electrician, etc.</div>
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
+
+            {/* Booking Form for Cab */}
+            {stage === "booking_form" && (
+              <BookingForm
+                onSubmit={handleBookingFormSubmit}
+                isLoading={isLoading}
+              />
+            )}
+
+            {/* Chat Messages for other stages */}
+            {stage !== "service_selection" && stage !== "booking_form" && (
+              <>
+                {messages.map((message) => (
+                  <ChatMessage key={message.id} message={message} />
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start mb-4">
+                    <div className="bg-gray-100 rounded-2xl px-4 py-3 rounded-bl-md">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -1787,7 +1906,8 @@ What can I help you find today?`,
             </div>
           )}
 
-          {/* Input */}
+          {/* Input - Hidden during service selection and booking form */}
+          {stage !== "service_selection" && stage !== "booking_form" && (
           <form onSubmit={handleSubmit} className="p-4 bg-white border-t">
             {stage === "results" ? (
               /* Show action buttons when calls are complete */
@@ -1839,6 +1959,7 @@ What can I help you find today?`,
               </div>
             )}
           </form>
+          )}
         </div>
 
         {/* Panel 2: Results (Research/Businesses/Calls) */}
