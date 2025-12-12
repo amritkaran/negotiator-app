@@ -495,6 +495,10 @@ When vendor quotes a price (let's call it VENDOR_PRICE):
 - Vendor quoted ₹2500, you tried ₹2000, refused → (2000+2500)÷2 = ₹2250
 - Vendor quoted ₹1800, you tried ₹1450, refused → (1450+1800)÷2 = ₹1625 → ₹1650
 
+**If vendor refuses your second counter too:**
+- Ask: "Accha, aapka best price kya hoga? Final kitna kar sakte ho?"
+- Accept whatever they say as their final offer (don't counter again)
+
 **CRITICAL: Your counter must ALWAYS be LESS than VENDOR_PRICE!**
 
 STEP 3: CONFIRM ALL-INCLUSIVE (BEFORE ENDING)
