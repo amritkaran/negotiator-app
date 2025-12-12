@@ -137,26 +137,41 @@ ${speechPhrases?.timePhrase ? `**Time:** Say "${timeSpeech}" (VERBATIM - do not 
 - You negotiate firmly but politely
 - Sound like a savvy young Indian professional
 
-## NEVER SAY NUMBERS DIGIT-BY-DIGIT (CRITICAL!)
-WRONG: "do shunya" "paanch ek do" "teen shunya shunya shunya"
-RIGHT: Say dates and numbers naturally like Indians speak:
+## NEVER SAY NUMBERS DIGIT-BY-DIGIT (MOST CRITICAL RULE!)
+**THIS IS THE MOST IMPORTANT RULE - BREAKING THIS SOUNDS ROBOTIC AND UNNATURAL**
+
+WRONG (NEVER DO THIS):
+- "teen shunya shunya shunya" ❌
+- "do paanch shunya shunya" ❌
+- "teen paanch shunya shunya" ❌
+- "shunya" for zero ❌
+
+RIGHT (ALWAYS DO THIS):
+- 3000 = "teen hazaar" ✓
+- 2500 = "dhai hazaar" or "pachchees sau" ✓
+- 3500 = "saadhey teen hazaar" or "paaintees sau" ✓
+- 2350 = "teis sau pachaas" ✓
+- 3675 = "chhatees sau pachhattar" ✓
+
+**PRICES - Common amounts:**
+- 1000 = "ek hazaar"
+- 1200 = "baarah sau"
+- 1500 = "pandrah sau"
+- 1800 = "athaarah sau"
+- 2000 = "do hazaar"
+- 2500 = "dhai hazaar" or "pachchees sau"
+- 3000 = "teen hazaar"
+- 3500 = "saadhey teen hazaar" or "paaintees sau"
+- 4000 = "chaar hazaar"
+- 5000 = "paanch hazaar"
 
 **DATES - Say naturally:**
-- 20/12 = "bees December" (NOT "do shunya ek do")
+- 20/12 = "bees December" (NOT "do shunya")
 - 25/1 = "pachchees January"
-- 15/2 = "pandrah February"
-- 5/1/2023 = "paanch January"
 
 **TIMES - Say naturally:**
 - 8:00 = "aath baje" (NOT "aath shunya shunya")
 - 10:30 = "saadhe das baje"
-- 2:00 PM = "dopahar do baje"
-
-**PRICES - Say naturally:**
-- 3000 = "teen hazaar" (NOT "teen shunya shunya shunya")
-- 2500 = "pachchees sau" or "dhai hazaar"
-- 1500 = "pandrah sau"
-- 1200 = "baarah sau"
 
 ## IDENTITY RULE
 - NEVER say you are AI or digital assistant
@@ -337,6 +352,91 @@ ${hitlInstructions}
 }
 
 /**
+ * Convert a number to Hindi words for natural speech
+ * Examples: 3500 -> "saadhey teen hazaar", 2000 -> "do hazaar"
+ */
+function numberToHindiWords(num: number): string {
+  if (num >= 1000) {
+    const thousands = Math.floor(num / 1000);
+    const remainder = num % 1000;
+
+    const thousandWords: Record<number, string> = {
+      1: "ek hazaar",
+      2: "do hazaar",
+      3: "teen hazaar",
+      4: "chaar hazaar",
+      5: "paanch hazaar",
+      6: "chhey hazaar",
+      7: "saat hazaar",
+      8: "aath hazaar",
+      9: "nau hazaar",
+      10: "das hazaar",
+    };
+
+    // Handle X500 cases (like 2500, 3500)
+    if (remainder === 500) {
+      if (thousands === 2) return "dhai hazaar";
+      return `saadhey ${thousandWords[thousands]?.replace(" hazaar", "") || thousands} hazaar`;
+    }
+
+    // Handle round thousands
+    if (remainder === 0) {
+      return thousandWords[thousands] || `${thousands} hazaar`;
+    }
+
+    // Handle other cases - use "sau" format
+    const totalInSau = Math.round(num / 100);
+    return numberToHindiSau(totalInSau);
+  }
+
+  // For numbers under 1000, use "sau" format
+  const inSau = Math.round(num / 100);
+  return numberToHindiSau(inSau);
+}
+
+/**
+ * Convert hundreds to Hindi (e.g., 35 -> "paaintees sau")
+ */
+function numberToHindiSau(sau: number): string {
+  const sauWords: Record<number, string> = {
+    10: "das sau",
+    11: "gyaarah sau",
+    12: "baarah sau",
+    13: "terah sau",
+    14: "chaudah sau",
+    15: "pandrah sau",
+    16: "solah sau",
+    17: "satrah sau",
+    18: "athaarah sau",
+    19: "unees sau",
+    20: "bees sau",
+    21: "ikkees sau",
+    22: "baees sau",
+    23: "teis sau",
+    24: "chaubees sau",
+    25: "pachchees sau",
+    26: "chhabees sau",
+    27: "sattaees sau",
+    28: "atthaees sau",
+    29: "untees sau",
+    30: "tees sau",
+    31: "ikattees sau",
+    32: "battees sau",
+    33: "taintees sau",
+    34: "chautees sau",
+    35: "paaintees sau",
+    36: "chhatees sau",
+    37: "saintees sau",
+    38: "adhtees sau",
+    39: "untaalees sau",
+    40: "chaalees sau",
+    45: "paintaalees sau",
+    50: "pachaas sau",
+  };
+  return sauWords[sau] || `${sau} sau`;
+}
+
+/**
  * Build the negotiation strategy section based on benchmark status
  */
 function buildNegotiationStrategy(context: NegotiationPromptContext): string {
@@ -346,6 +446,12 @@ function buildNegotiationStrategy(context: NegotiationPromptContext): string {
   const isFirstVendor = !benchmark;
 
   if (isFirstVendor) {
+    // Calculate counter-offer prices for first vendor
+    const counterLow = expectedPriceLow ? numberToHindiWords(expectedPriceLow) : "athaarah sau";
+    const counterMid = expectedPriceLow && expectedPriceHigh
+      ? numberToHindiWords(Math.round((expectedPriceLow + expectedPriceHigh) / 2 / 50) * 50)
+      : "unees sau";
+
     return `## NEGOTIATION STRATEGY (First Vendor - No Benchmark Yet)
 
 **YOU MUST NEGOTIATE AT LEAST ONCE - THIS IS MANDATORY!**
@@ -357,15 +463,13 @@ STEP 1: GET THEIR QUOTE FIRST
 STEP 2: WHEN VENDOR QUOTES A PRICE - YOU MUST COUNTER-OFFER!
 **MANDATORY: Always try to negotiate down. Never accept first price.**
 
-${expectedPriceLow && expectedPriceHigh ? `Example: If vendor says "₹${expectedPriceHigh}", you say:
-"${expectedPriceHigh} thoda zyada hai. ${expectedPriceLow} mein ho jayega kya?"
+**IMPORTANT: Say prices in Hindi words, NOT digits!**
 
-If they refuse, try once more:
-"Accha, ${Math.round((expectedPriceLow + expectedPriceHigh) / 2)} mein kar dijiye. Regular customer ban jayenge."` : `Example: If vendor says "₹2000", you say:
-"Do hazaar thoda zyada hai. Athaarah sau mein ho jayega kya?"
+Example counter-offers (SAY THESE EXACT WORDS):
+- First try: "[quoted price] thoda zyada hai. ${counterLow} mein ho jayega kya?"
+- If refused: "Accha, ${counterMid} mein kar dijiye. Regular customer ban jayenge."
 
-If they refuse, try once more:
-"Accha, unees sau mein kar dijiye. Regular customer ban jayenge."`}
+**Remember: Say "${counterLow}" not the number digits!**
 
 STEP 3: END THE CALL (ALWAYS)
 - Say: "Theek hai, dhanyavaad. Confirm karke thodi der mein callback karti hoon."
@@ -373,6 +477,8 @@ STEP 3: END THE CALL (ALWAYS)
   } else {
     // Calculate target price (10% below benchmark)
     const targetPrice = Math.round(benchmark * 0.9 / 50) * 50; // Round to nearest 50
+    const benchmarkWords = numberToHindiWords(benchmark);
+    const targetWords = numberToHindiWords(targetPrice);
 
     return `## NEGOTIATION STRATEGY (Subsequent Vendor - Benchmark: ₹${benchmark})
 
@@ -385,12 +491,16 @@ STEP 1: GET THEIR QUOTE FIRST
 
 STEP 2: WHEN VENDOR QUOTES A PRICE - YOU MUST COUNTER-OFFER!
 
-A) **If price > ₹${benchmark}** (above your benchmark):
-   - Say: "Mujhe doosri jagah ${benchmark} mein mil raha hai. Aap ${targetPrice} mein kar sakte ho?"
-   - If they can't beat ${benchmark}, politely end
+**IMPORTANT: Say prices in Hindi words, NOT digits!**
+- Benchmark in words: "${benchmarkWords}"
+- Target in words: "${targetWords}"
 
-B) **If price ≤ ₹${benchmark}** (at or below benchmark):
-   - Still try for lower: "Accha price hai! Thoda aur kam ho sakta hai? ${targetPrice} mein ho jayega?"
+A) **If price > benchmark** (above your benchmark):
+   - Say: "Mujhe doosri jagah ${benchmarkWords} mein mil raha hai. Aap ${targetWords} mein kar sakte ho?"
+   - If they can't beat benchmark, politely end
+
+B) **If price ≤ benchmark** (at or below benchmark):
+   - Still try for lower: "Accha price hai! Thoda aur kam ho sakta hai? ${targetWords} mein ho jayega?"
    - Even if they say no, this is a good deal
 
 STEP 3: END THE CALL (ALWAYS)
