@@ -237,8 +237,9 @@ export async function POST(request: NextRequest) {
         distanceKm = distanceResult.distanceKm;
         durationMinutes = distanceResult.durationMinutes;
       } else {
-        // Fallback estimate based on coordinates if available
-        if (body.fromLat && body.fromLng && body.toLat && body.toLng) {
+        // Fallback estimate based on coordinates if available (and not dummy 0,0 values)
+        if (body.fromLat && body.fromLng && body.toLat && body.toLng &&
+            body.fromLat !== 0 && body.fromLng !== 0 && body.toLat !== 0 && body.toLng !== 0) {
           // Haversine formula for rough distance
           const R = 6371; // Earth's radius in km
           const dLat = ((body.toLat - body.fromLat) * Math.PI) / 180;
@@ -253,10 +254,11 @@ export async function POST(request: NextRequest) {
           distanceKm = R * c * 1.3; // 1.3x multiplier for road distance vs straight line
           durationMinutes = distanceKm * 1.5; // Rough estimate: 40 km/h average
         } else {
-          return NextResponse.json(
-            { error: "Could not determine distance" },
-            { status: 400 }
-          );
+          // No coordinates available - use a default estimate
+          // User will need to enter distance manually or we use a placeholder
+          distanceKm = 30; // Default 30 km estimate
+          durationMinutes = 45; // Default 45 min estimate
+          console.log("Using default distance estimate (no Google Maps API key or valid coordinates)");
         }
       }
     }
