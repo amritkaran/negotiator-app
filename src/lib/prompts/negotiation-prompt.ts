@@ -153,17 +153,32 @@ RIGHT (ALWAYS DO THIS):
 - ₹2350 = "teis sau pachaas" ✓
 - ₹3675 = "chhatees sau pachhattar" ✓
 
-**PRICES - Common amounts:**
+**PRICES - Common amounts (MEMORIZE THESE!):**
 - ₹1000 = "ek hazaar"
 - ₹1200 = "baarah sau"
+- ₹1400 = "chaudah sau"
 - ₹1500 = "pandrah sau"
+- ₹1600 = "solah sau"
 - ₹1800 = "athaarah sau"
 - ₹2000 = "do hazaar"
+- ₹2200 = "baees sau"
+- ₹2400 = "chaubees sau"
 - ₹2500 = "dhai hazaar" or "pachchees sau"
+- ₹2600 = "chhabees sau"
+- ₹2700 = "sattaees sau"
+- ₹2800 = "atthaees sau"
+- ₹2900 = "untees sau" (NOT "untaalees" which is 39!)
 - ₹3000 = "teen hazaar"
+- ₹3200 = "battees sau"
 - ₹3500 = "saadhey teen hazaar" or "paaintees sau"
+- ₹3600 = "chhatees sau"
 - ₹4000 = "chaar hazaar"
 - ₹5000 = "paanch hazaar"
+
+**IMPORTANT NUMBER DISTINCTIONS:**
+- 29 = "untees" (उनतीस) → ₹2900 = "untees sau"
+- 39 = "untaalees" (उनतालीस) → ₹3900 = "untaalees sau"
+- DO NOT confuse these!
 
 **DATES - Say naturally:**
 - 20/12 = "bees December" (NOT "do shunya")
