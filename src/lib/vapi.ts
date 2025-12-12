@@ -195,7 +195,7 @@ export async function makeOutboundCall(
         serverUrlSecret: process.env.VAPI_WEBHOOK_SECRET,
         model: {
           provider: "google",
-          model: "gemini-2.0-flash",
+          model: "gemini-2.5-flash-preview-04-17",
           messages: [
             {
               role: "system",
