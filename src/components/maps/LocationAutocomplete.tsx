@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useCallback } from "react";
-import { Autocomplete } from "@react-google-maps/api";
+import { useRef, useCallback, useState } from "react";
+import { Autocomplete, useLoadScript } from "@react-google-maps/api";
 
 export interface LocationResult {
   address: string;
@@ -20,6 +20,9 @@ interface LocationAutocompleteProps {
   disabled?: boolean;
 }
 
+// Check if Google Maps API is available
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+
 export function LocationAutocomplete({
   placeholder = "Enter location",
   value,
@@ -31,6 +34,67 @@ export function LocationAutocomplete({
 }: LocationAutocompleteProps) {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [manualInput, setManualInput] = useState(value || "");
+
+  // If no API key, render a simple text input
+  if (!GOOGLE_MAPS_API_KEY) {
+    const iconColor = icon === "pickup" ? "text-green-600" : "text-red-600";
+    const iconBg = icon === "pickup" ? "bg-green-50" : "bg-red-50";
+
+    return (
+      <div className={`relative ${className}`}>
+        <div className="flex items-center">
+          <div className={`flex items-center justify-center w-10 h-10 rounded-l-lg ${iconBg}`}>
+            <svg
+              className={`w-5 h-5 ${iconColor}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder={placeholder}
+            value={manualInput}
+            onChange={(e) => {
+              setManualInput(e.target.value);
+              onInputChange?.(e.target.value);
+              // Create a simple location result with dummy coordinates
+              if (e.target.value) {
+                onChange({
+                  address: e.target.value,
+                  lat: 0,
+                  lng: 0,
+                });
+              } else {
+                onChange(null);
+              }
+            }}
+            disabled={disabled}
+            className={`
+              w-full px-4 py-3 border border-l-0 border-gray-300 rounded-r-lg
+              focus:ring-2 focus:ring-blue-500 focus:border-transparent
+              disabled:bg-gray-100 disabled:cursor-not-allowed
+              text-gray-900 placeholder-gray-500
+            `}
+          />
+        </div>
+      </div>
+    );
+  }
 
   const onLoad = useCallback((autocomplete: google.maps.places.Autocomplete) => {
     autocompleteRef.current = autocomplete;
