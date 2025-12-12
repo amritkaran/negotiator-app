@@ -448,45 +448,39 @@ function buildNegotiationStrategy(context: NegotiationPromptContext): string {
   const isFirstVendor = !benchmark;
 
   if (isFirstVendor) {
-    // Calculate dynamic counter-offer prices based on expected price range
-    const firstCounter = expectedPriceLow
-      ? Math.round(expectedPriceLow * 0.85 / 50) * 50  // 15% below low estimate
-      : null;
-    const secondCounter = expectedPriceLow && expectedPriceHigh
-      ? Math.round((expectedPriceLow + expectedPriceHigh) / 2 * 0.9 / 50) * 50  // 10% below mid
-      : null;
-
-    const firstCounterWords = firstCounter ? numberToHindiWords(firstCounter) : null;
-    const secondCounterWords = secondCounter ? numberToHindiWords(secondCounter) : null;
-
     return `## NEGOTIATION STRATEGY (First Vendor - No Benchmark Yet)
 
 **YOU MUST NEGOTIATE AT LEAST ONCE - THIS IS MANDATORY!**
 
-${expectedPriceLow && expectedPriceHigh ? `**Expected Price Range:** ₹${expectedPriceLow} - ₹${expectedPriceHigh}
-**Your Target:** Try to get below ₹${expectedPriceLow}
-**First Counter-Offer:** ₹${firstCounter} (${firstCounterWords})
-**Second Counter-Offer (if refused):** ₹${secondCounter} (${secondCounterWords})` : ""}
+${expectedPriceLow && expectedPriceHigh ? `**Expected Price Range:** ₹${expectedPriceLow} - ₹${expectedPriceHigh}` : ""}
 
 STEP 1: GET THEIR QUOTE FIRST
 - Ask: "Aapka rate kya hoga?"
 - WAIT for their quote - NEVER mention any price first
 
 STEP 2: WHEN VENDOR QUOTES A PRICE - YOU MUST COUNTER-OFFER!
-**MANDATORY: Always try to negotiate down. Never accept first price.**
 
-**CRITICAL: Your counter-offer must ALWAYS be LOWER than what vendor quoted!**
+**CALCULATION RULE FOR COUNTER-OFFER:**
+When vendor quotes a price (let's call it VENDOR_PRICE):
+- **First Counter = VENDOR_PRICE × 0.80** (20% less than their quote)
+- Round to nearest ₹50
 
-**How to counter-offer:**
-- Calculate 15-20% below their quote for first counter
-- If they quoted X, your counter should be around 0.8X to 0.85X
-${firstCounter ? `- For this trip, start with: "${firstCounterWords}" (₹${firstCounter})` : ""}
+**Examples of the calculation:**
+- Vendor says ₹3000 → First counter = 3000 × 0.80 = ₹2400
+- Vendor says ₹2500 → First counter = 2500 × 0.80 = ₹2000
+- Vendor says ₹4000 → First counter = 4000 × 0.80 = ₹3200
+- Vendor says ₹1800 → First counter = 1800 × 0.80 = ₹1450 → round to ₹1450
 
 **If vendor refuses your first counter:**
-- Your SECOND counter must STILL be BELOW their original quote!
-- Go halfway between your first counter and their quote
-${secondCounter ? `- For this trip, try: "${secondCounterWords}" (₹${secondCounter})` : ""}
-- **NEVER go ABOVE their original quote!**
+- **Second Counter = (First Counter + VENDOR_PRICE) ÷ 2** (halfway between)
+- This is STILL below their original quote
+
+**Examples:**
+- Vendor quoted ₹3000, you tried ₹2400, refused → (2400+3000)÷2 = ₹2700
+- Vendor quoted ₹2500, you tried ₹2000, refused → (2000+2500)÷2 = ₹2250
+- Vendor quoted ₹1800, you tried ₹1450, refused → (1450+1800)÷2 = ₹1625 → ₹1650
+
+**CRITICAL: Your counter must ALWAYS be LESS than VENDOR_PRICE!**
 
 STEP 3: CONFIRM ALL-INCLUSIVE (BEFORE ENDING)
 - Ask: "Ye toll, parking sab include hai na? Koi extra charge nahi?"
