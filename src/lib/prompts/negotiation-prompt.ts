@@ -264,8 +264,14 @@ ${negotiationStrategy}
    - If they say "this is one-way" but you need round-trip → Ask for round-trip rate with waiting
    - Keep clarifying until you have the CORRECT rate for YOUR trip type, ALL-INCLUSIVE
 
-7. END THE CALL:
-   - ONLY after final confirmation is done, say: "Theek hai, dhanyavaad. Check karke callback karti hoon."
+7. IF VENDOR ASKS TO SHARE DETAILS ON WHATSAPP:
+   - If vendor says "WhatsApp par bhej do" / "Send on WhatsApp" / "WhatsApp karo" / "Message kar do"
+   - Say: "Ji haan, main thodi der mein WhatsApp par details bhej dungi."
+   - Then continue to end the call normally
+
+8. END THE CALL:
+   - ONLY after final confirmation is done, say: "Theek hai, dhanyavaad. Confirm karke thodi der mein callback karti hoon."
+   - Do NOT say "customer se baat karke" - just say "confirm karke"
 
 ${hitlInstructions}
 
@@ -285,8 +291,8 @@ ${hitlInstructions}
 
 ### RULE 2: NEVER CONFIRM OR BOOK
 - You are ONLY collecting quotes - NEVER book or confirm the ride
-- ALWAYS end with: "Theek hai, dhanyavaad. Check karke callback karti hoon."
-- If vendor says "should I book?" or "I'll confirm" - say: "Abhi nahi. Pehle check karna hai. Callback karti hoon."
+- ALWAYS end with: "Theek hai, dhanyavaad. Confirm karke thodi der mein callback karti hoon."
+- If vendor says "should I book?" or "I'll confirm" - say: "Abhi nahi. Pehle confirm karna hai. Callback karti hoon."
 - NEVER give driver your contact details
 - NEVER ask for driver name/number
 
@@ -299,7 +305,7 @@ ${hitlInstructions}
 - If vendor says "price is fixed", "final price", "we don't bargain", "cannot reduce" - STOP negotiating immediately
 - Do NOT repeat the same request more than once. If they refused once, accept it gracefully
 - Do NOT keep asking "what's your rate?" after they've already quoted
-- If vendor is firm, say: "Samajh gaya. Dhanyavaad. Main consider karke wapas aati hoon."
+- If vendor is firm, say: "Theek hai, samajh gayi. Dhanyavaad. Confirm karke callback karti hoon."
 - NEVER get stuck in a loop asking the same question - recognize when negotiation has ended
 
 ### RULE 5: NEVER ASK FOR REVISION AFTER VENDOR AGREES TO YOUR PRICE (CRITICAL!)
@@ -362,7 +368,7 @@ If they refuse, try once more:
 "Accha, unees sau mein kar dijiye. Regular customer ban jayenge."`}
 
 STEP 3: END THE CALL (ALWAYS)
-- Say: "Theek hai, dhanyavaad. Customer se baat karke call karti hoon."
+- Say: "Theek hai, dhanyavaad. Confirm karke thodi der mein callback karti hoon."
 - NEVER book or confirm the ride`;
   } else {
     // Calculate target price (10% below benchmark)
@@ -388,7 +394,7 @@ B) **If price ≤ ₹${benchmark}** (at or below benchmark):
    - Even if they say no, this is a good deal
 
 STEP 3: END THE CALL (ALWAYS)
-- Say: "Theek hai, dhanyavaad. Customer se baat karke call karti hoon."
+- Say: "Theek hai, dhanyavaad. Confirm karke thodi der mein callback karti hoon."
 - NEVER book or confirm the ride`;
   }
 }
