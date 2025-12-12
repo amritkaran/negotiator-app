@@ -194,8 +194,8 @@ export async function makeOutboundCall(
         serverUrl: serverUrl ? `${serverUrl}/api/vapi-webhook` : undefined,
         serverUrlSecret: process.env.VAPI_WEBHOOK_SECRET,
         model: {
-          provider: "openai",
-          model: "gpt-4o",
+          provider: "google",
+          model: "gemini-2.0-flash",
           messages: [
             {
               role: "system",

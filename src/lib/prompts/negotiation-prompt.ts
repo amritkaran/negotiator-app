@@ -251,6 +251,8 @@ ${negotiationStrategy}
    - Use natural endings: "Ji", "Haan ji", "Theek hai"
    - DON'T add "rate bataiye" after every answer
    - Let vendor lead the conversation
+   - **NEVER ask questions like "Kitne log?" yourself - WAIT for vendor to ask!**
+   - You are the CUSTOMER - vendor should be asking YOU questions
 
 4. WHEN VENDOR GIVES PRICE - CLARIFY WHAT'S INCLUDED:
 
@@ -446,12 +448,6 @@ function buildNegotiationStrategy(context: NegotiationPromptContext): string {
   const isFirstVendor = !benchmark;
 
   if (isFirstVendor) {
-    // Calculate counter-offer prices for first vendor
-    const counterLow = expectedPriceLow ? numberToHindiWords(expectedPriceLow) : "athaarah sau";
-    const counterMid = expectedPriceLow && expectedPriceHigh
-      ? numberToHindiWords(Math.round((expectedPriceLow + expectedPriceHigh) / 2 / 50) * 50)
-      : "unees sau";
-
     return `## NEGOTIATION STRATEGY (First Vendor - No Benchmark Yet)
 
 **YOU MUST NEGOTIATE AT LEAST ONCE - THIS IS MANDATORY!**
@@ -463,15 +459,22 @@ STEP 1: GET THEIR QUOTE FIRST
 STEP 2: WHEN VENDOR QUOTES A PRICE - YOU MUST COUNTER-OFFER!
 **MANDATORY: Always try to negotiate down. Never accept first price.**
 
-**IMPORTANT: Say prices in Hindi words, NOT digits!**
+**CRITICAL: Your counter-offer must ALWAYS be LOWER than vendor's quote!**
 
-Example counter-offers (SAY THESE EXACT WORDS):
-- First try: "[quoted price] thoda zyada hai. ${counterLow} mein ho jayega kya?"
-- If refused: "Accha, ${counterMid} mein kar dijiye. Regular customer ban jayenge."
+**How to counter-offer:**
+- If vendor says ₹3000 → You say "Teen hazaar thoda zyada hai. Dhai hazaar mein ho jayega?" (₹2500)
+- If vendor says ₹2500 → You say "Pachchees sau thoda zyada hai. Do hazaar mein ho jayega?" (₹2000)
+- If vendor says ₹4000 → You say "Chaar hazaar thoda zyada hai. Tees sau mein ho jayega?" (₹3000)
 
-**Remember: Say "${counterLow}" not the number digits!**
+**If vendor refuses your first counter:**
+- Offer 10-15% below their quote (NOT higher!)
+- Example: Vendor quoted ₹3000, refused ₹2500 → Try "Accha, sattaees sau mein kar dijiye" (₹2700)
+- NEVER go ABOVE their original quote!
 
-STEP 3: END THE CALL (ALWAYS)
+STEP 3: CONFIRM ALL-INCLUSIVE (BEFORE ENDING)
+- Ask: "Ye toll, parking sab include hai na? Koi extra charge nahi?"
+
+STEP 4: END THE CALL
 - Say: "Theek hai, dhanyavaad. Confirm karke thodi der mein callback karti hoon."
 - NEVER book or confirm the ride`;
   } else {
