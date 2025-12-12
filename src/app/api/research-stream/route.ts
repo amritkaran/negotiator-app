@@ -120,10 +120,11 @@ type ResearchStep = {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  const { requirements, sessionId } = await request.json();
+  const { requirements, sessionId, intakePriceEstimate } = await request.json();
 
   console.log(`[research-stream] Starting research for session ${sessionId}`);
   console.log(`[research-stream] Preferred vendors:`, requirements.preferredVendors);
+  console.log(`[research-stream] Intake price estimate provided:`, intakePriceEstimate ? "YES" : "NO");
 
   if (!requirements?.from || !requirements?.service) {
     return new Response(
@@ -276,7 +277,22 @@ Keep it concise (under 100 words).`;
           confidence: "medium",
         };
 
-        if (requirements.to) {
+        // Use intake price estimate if provided (from BookingForm)
+        if (intakePriceEstimate && intakePriceEstimate.priceRange?.mid > 0) {
+          console.log("[research-stream] Using intake price estimate from BookingForm");
+          priceIntel = {
+            estimatedDistance: intakePriceEstimate.distanceKm || 0,
+            estimatedDuration: intakePriceEstimate.durationMinutes || 0,
+            baselinePrice: {
+              low: intakePriceEstimate.priceRange.low,
+              mid: intakePriceEstimate.priceRange.mid,
+              high: intakePriceEstimate.priceRange.high,
+            },
+            factors: ["Price from intake form (pre-calculated)"],
+            confidence: intakePriceEstimate.confidence || "high",
+          };
+        } else if (requirements.to) {
+          // No intake price estimate - calculate from scratch
           try {
             const destCoords = await geocodeAddress(requirements.to);
             if (destCoords) {
@@ -334,39 +350,38 @@ Keep it concise (under 100 words).`;
           } catch (error) {
             console.error("Distance calculation error:", error);
           }
-        }
 
-        // If distance matrix failed, use Perplexity for real market prices
-        if (priceIntel.baselinePrice.mid === 0 && requirements.to) {
-          console.log("[research-stream] Distance matrix failed, using Perplexity for price research...");
+          // If distance matrix failed, use Perplexity for real market prices
+          if (priceIntel.baselinePrice.mid === 0) {
+            console.log("[research-stream] Distance matrix failed, using Perplexity for price research...");
 
-          // Try Perplexity first for real market data
-          const perplexityResult = await searchRealPricesWithPerplexity(
-            requirements.from,
-            requirements.to,
-            requirements.service,
-            requirements.vehicleType
-          );
+            // Try Perplexity first for real market data
+            const perplexityResult = await searchRealPricesWithPerplexity(
+              requirements.from,
+              requirements.to,
+              requirements.service,
+              requirements.vehicleType
+            );
 
-          if (perplexityResult && perplexityResult.mid > 0) {
-            priceIntel.baselinePrice = {
-              low: perplexityResult.low,
-              mid: perplexityResult.mid,
-              high: perplexityResult.high,
-            };
-            priceIntel.factors = [
-              "Real-time web search data",
-              ...perplexityResult.sources,
-            ];
-            priceIntel.confidence = "high";
-            console.log("[research-stream] Using Perplexity prices:", priceIntel.baselinePrice);
-          } else {
-            // Fallback to reasonable estimates based on typical India cab rates
-            // Ambala to Patiala is about 75-80 km, typical rate is ₹10-15/km for SUV
-            console.log("[research-stream] Perplexity failed, using fallback estimates");
-            priceIntel.baselinePrice = { low: 800, mid: 1200, high: 1800 };
-            priceIntel.factors = ["Estimated based on typical intercity rates (₹10-15/km)"];
-            priceIntel.confidence = "low";
+            if (perplexityResult && perplexityResult.mid > 0) {
+              priceIntel.baselinePrice = {
+                low: perplexityResult.low,
+                mid: perplexityResult.mid,
+                high: perplexityResult.high,
+              };
+              priceIntel.factors = [
+                "Real-time web search data",
+                ...perplexityResult.sources,
+              ];
+              priceIntel.confidence = "high";
+              console.log("[research-stream] Using Perplexity prices:", priceIntel.baselinePrice);
+            } else {
+              // Fallback to reasonable estimates based on typical India cab rates
+              console.log("[research-stream] Perplexity failed, using fallback estimates");
+              priceIntel.baselinePrice = { low: 800, mid: 1200, high: 1800 };
+              priceIntel.factors = ["Estimated based on typical intercity rates (₹10-15/km)"];
+              priceIntel.confidence = "low";
+            }
           }
         } else if (priceIntel.baselinePrice.mid === 0) {
           // No destination - local service

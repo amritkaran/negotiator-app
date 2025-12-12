@@ -301,7 +301,7 @@ export async function POST(request: NextRequest) {
         high: blendedHigh,
         rationale,
       };
-      rationale.push("Cross-verified with current market rates (Ola/Uber/local)");
+      rationale.push("Adjusted based on online price references");
       confidence = "high";
     } else {
       rationale.push("Based on standard market rates for this route");

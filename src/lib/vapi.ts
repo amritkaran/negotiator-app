@@ -1,4 +1,4 @@
-import { CallResult, UserRequirement, Business } from "@/types";
+import { CallResult, UserRequirement, Business, NegotiatorPersona, NEGOTIATOR_PERSONAS } from "@/types";
 import { buildNegotiationPrompt, NegotiationPromptContext } from "./prompts/negotiation-prompt";
 
 const VAPI_API_KEY = process.env.VAPI_API_KEY;
@@ -27,10 +27,15 @@ function createNegotiationPrompt(
     expectedPriceMid?: number;
     expectedPriceHigh?: number;
     bestVendorSoFar?: string;
-  }
+  },
+  persona: NegotiatorPersona = "preet"
 ): string {
+  // Get agent name from persona
+  const agentName = NEGOTIATOR_PERSONAS[persona].name;
+
   const context: NegotiationPromptContext = {
-    agentName: "Preet",
+    agentName,
+    persona,
     vendorName: business.name,
     service: requirements.service,
     from: requirements.from || "pickup location",
@@ -43,6 +48,8 @@ function createNegotiationPrompt(
     waitingTime: requirements.waitingTime,
     tollPreference: requirements.tollPreference,
     specialInstructions: requirements.specialInstructions,
+    // Custom speech phrases - Bot says EXACTLY what user typed
+    speechPhrases: requirements.speechPhrases,
     expectedPriceLow: priceContext?.expectedPriceLow,
     expectedPriceMid: priceContext?.expectedPriceMid,
     expectedPriceHigh: priceContext?.expectedPriceHigh,
@@ -90,8 +97,13 @@ export async function makeOutboundCall(
     expectedPriceMid?: number;
     expectedPriceHigh?: number;
     bestVendorSoFar?: string;
-  }
+  },
+  persona: NegotiatorPersona = "preet"
 ): Promise<{ callId: string; status: string }> {
+  // Get persona config
+  const personaConfig = NEGOTIATOR_PERSONAS[persona];
+  const agentName = personaConfig.name;
+
   // Get Azure voice config for selected regional language
   const selectedLang = regionalLanguage || "hi";
   const azureConfig = AZURE_VOICE_MAP[selectedLang] || AZURE_VOICE_MAP.hi;
@@ -99,12 +111,13 @@ export async function makeOutboundCall(
   // Determine language for prompts - use regional language name if regional mode, else Hindi
   const promptLanguage = useRegionalLanguages ? azureConfig.langName.toLowerCase() : "hindi";
 
-  const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar, promptLanguage, priceContext);
+  const systemPrompt = createNegotiationPrompt(requirements, business, lowestPriceSoFar, promptLanguage, priceContext, persona);
 
   // Use language-specific first message for regional languages, default Hindi otherwise
   const firstMessageFn = useRegionalLanguages
     ? (FIRST_MESSAGES[selectedLang] || FIRST_MESSAGES.hi)
     : FIRST_MESSAGES.hi;
+
   const firstMessage = firstMessageFn(business.name.slice(0, 30)); // Truncate for readability
 
   // Configure transcriber based on language mode
@@ -123,18 +136,23 @@ export async function makeOutboundCall(
       };
 
   // Configure voice (TTS) based on language mode
-  // - Hindi/English mode: Cartesia (low latency, good Hindi support)
   // - Regional mode: Azure Neural TTS with language-specific voice
-  const voice = useRegionalLanguages
-    ? {
-        provider: "azure" as const,
-        voiceId: azureConfig.voiceId,
-      }
-    : {
-        provider: "cartesia" as const,
-        voiceId: "95d51f79-c397-46f9-b49a-23763d3eaa2d", // Arushi Hinglish female voice
-        language: "hi" as const,
-      };
+  // - Hindi/English mode: Cartesia (low latency, good Hindi support)
+  let voice;
+  if (useRegionalLanguages) {
+    // Regional languages use Azure Neural TTS
+    voice = {
+      provider: "azure" as const,
+      voiceId: azureConfig.voiceId,
+    };
+  } else {
+    // Preet uses Cartesia (default Hindi/English mode)
+    voice = {
+      provider: "cartesia" as const,
+      voiceId: "95d51f79-c397-46f9-b49a-23763d3eaa2d", // Arushi Hinglish female voice
+      language: "hi" as const,
+    };
+  }
 
   // TEST MODE: If TEST_PHONE_NUMBER is set, use it instead of the vendor's number
   const testPhoneNumber = process.env.TEST_PHONE_NUMBER;
@@ -231,6 +249,8 @@ export async function makeOutboundCall(
         businessId: business.id,
         businessName: business.name,
         service: requirements.service,
+        persona: persona,
+        agentName: agentName,
       },
     }),
   });

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { LocationAutocomplete, RoutePreviewMap, LocationResult } from "./maps";
 import { UserRequirement } from "@/types";
 
-interface PriceEstimate {
+export interface PriceEstimate {
   distanceKm: number;
   durationMinutes: number;
   priceRange: {
@@ -18,7 +18,7 @@ interface PriceEstimate {
 }
 
 interface BookingFormProps {
-  onSubmit: (requirements: UserRequirement) => void;
+  onSubmit: (requirements: UserRequirement, priceEstimate: PriceEstimate | null) => void;
   isLoading?: boolean;
 }
 
@@ -51,6 +51,12 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
   const [pickupPoint, setPickupPoint] = useState<string>("");
   const [dropPoint, setDropPoint] = useState<string>("");
   const [specialInstructions, setSpecialInstructions] = useState<string>("");
+
+  // Custom speech phrases - Bot will say EXACTLY what user types
+  const [pickupPhrase, setPickupPhrase] = useState<string>("");
+  const [dropPhrase, setDropPhrase] = useState<string>("");
+  const [datePhrase, setDatePhrase] = useState<string>("");
+  const [timePhrase, setTimePhrase] = useState<string>("");
 
   // Price estimate state
   const [priceEstimate, setPriceEstimate] = useState<PriceEstimate | null>(null);
@@ -152,9 +158,9 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
       date,
       time,
       passengers: parseInt(passengers, 10),
-      tripType,
+      tripType: tripType === "" ? undefined : tripType,
       vehicleType: vehicleType || undefined,
-      tollPreference,
+      tollPreference: tollPreference === "" ? undefined : tollPreference,
       userLocation: {
         lat: pickup.lat,
         lng: pickup.lng,
@@ -168,9 +174,16 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
         specialInstructions: specialInstructions || undefined,
       },
       specialInstructions: specialInstructions || undefined,
+      // Custom speech phrases - Bot will say EXACTLY what user types
+      speechPhrases: {
+        pickupPhrase: pickupPhrase || undefined,
+        dropPhrase: dropPhrase || undefined,
+        datePhrase: datePhrase || undefined,
+        timePhrase: timePhrase || undefined,
+      },
     };
 
-    onSubmit(requirements);
+    onSubmit(requirements, priceEstimate);
   };
 
   const isFormValid = pickup && drop && date && hour && minute && ampm && passengers && tripType && vehicleType && tollPreference;
@@ -570,6 +583,92 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 resize-none"
             />
           </div>
+        </div>
+      )}
+
+      {/* Custom Speech Phrases - Bot will say EXACTLY what you type */}
+      {priceEstimate && (
+        <div className="border-t border-purple-200 pt-4 mt-4 bg-purple-50 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+            <span>🎙️</span>
+            <span>How Bot Should Say It (Optional)</span>
+          </h3>
+          <p className="text-xs text-purple-600 mb-4">
+            Type exactly how the bot should pronounce these in Hindi/Hinglish. Bot will use your text VERBATIM.
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Pickup Phrase */}
+            <div>
+              <label className="block text-xs font-medium text-purple-700 mb-1">
+                Pickup Location Speech
+              </label>
+              <input
+                type="text"
+                value={pickupPhrase}
+                onChange={(e) => setPickupPhrase(e.target.value)}
+                placeholder="e.g., Koramangala se"
+                className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 text-sm"
+              />
+            </div>
+
+            {/* Drop Phrase */}
+            <div>
+              <label className="block text-xs font-medium text-purple-700 mb-1">
+                Drop Location Speech
+              </label>
+              <input
+                type="text"
+                value={dropPhrase}
+                onChange={(e) => setDropPhrase(e.target.value)}
+                placeholder="e.g., Airport tak"
+                className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 text-sm"
+              />
+            </div>
+
+            {/* Date Phrase */}
+            <div>
+              <label className="block text-xs font-medium text-purple-700 mb-1">
+                Date Speech
+              </label>
+              <input
+                type="text"
+                value={datePhrase}
+                onChange={(e) => setDatePhrase(e.target.value)}
+                placeholder="e.g., bees December ko"
+                className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 text-sm"
+              />
+            </div>
+
+            {/* Time Phrase */}
+            <div>
+              <label className="block text-xs font-medium text-purple-700 mb-1">
+                Time Speech
+              </label>
+              <input
+                type="text"
+                value={timePhrase}
+                onChange={(e) => setTimePhrase(e.target.value)}
+                placeholder="e.g., subah aath baje"
+                className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Preview of what bot will say */}
+          {(pickupPhrase || dropPhrase) && (
+            <div className="mt-3 p-3 bg-white rounded-lg border border-purple-200">
+              <div className="text-xs font-medium text-purple-700 mb-1">Preview: Bot will say:</div>
+              <div className="text-sm text-gray-800 italic">
+                &quot;Mujhe ek cab chahiye {pickupPhrase || "[pickup]"} {dropPhrase || "[drop]"} ke liye. Available hai?&quot;
+              </div>
+              {(datePhrase || timePhrase) && (
+                <div className="text-sm text-gray-800 italic mt-1">
+                  When asked about timing: &quot;{datePhrase || "[date]"}{datePhrase && timePhrase ? ", " : ""}{timePhrase || "[time]"}&quot;
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

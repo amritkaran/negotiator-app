@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ChatMessage as ChatMessageType, Business, UserRequirement } from "@/types";
+import { ChatMessage as ChatMessageType, Business, UserRequirement, NegotiatorPersona, NEGOTIATOR_PERSONAS } from "@/types";
 import { ChatMessage } from "./ChatMessage";
-import { BookingForm } from "./BookingForm";
+import { BookingForm, PriceEstimate as BookingPriceEstimate } from "./BookingForm";
 import { AgentWorkflowPanel, AgentState, WorkflowEvent, AgentStatus } from "./AgentWorkflowPanel";
 import { VendorSimulationPanel } from "./VendorSimulationPanel";
 import { LearningPanel } from "./LearningPanel";
@@ -463,6 +463,7 @@ What can I help you find today?`,
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [callStatuses, setCallStatuses] = useState<Map<string, CallStatus>>(new Map());
   const [priceIntel, setPriceIntel] = useState<PriceIntel | null>(null);
+  const [intakePriceEstimate, setIntakePriceEstimate] = useState<BookingPriceEstimate | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [rankedBusinesses, setRankedBusinesses] = useState<RankedBusiness[]>([]);
   const [researchSteps, setResearchSteps] = useState<ResearchStep[]>([]);
@@ -513,6 +514,9 @@ What can I help you find today?`,
   // Language preference for transcription
   const [languageMode, setLanguageMode] = useState<"hindi-english" | "regional">("hindi-english");
   const [regionalLanguage, setRegionalLanguage] = useState<"hi" | "kn" | "te" | "ta" | "bn" | "mr" | "gu">("hi");
+
+  // Negotiator persona selection
+  const negotiatorPersona: NegotiatorPersona = "preet"; // Only Preet persona is used
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -655,12 +659,33 @@ What can I help you find today?`,
     addWorkflowEvent("handoff", "research", "Handoff from Intake → Research");
     addMessage("assistant", "🔬 Starting deep research to find and analyze service providers...");
 
+    // If we have intake price estimate, set it immediately so it displays during research
+    if (intakePriceEstimate) {
+      setPriceIntel({
+        estimatedDistance: intakePriceEstimate.distanceKm,
+        estimatedDuration: intakePriceEstimate.durationMinutes,
+        baselinePrice: intakePriceEstimate.priceRange,
+        factors: intakePriceEstimate.rationale || [],
+        confidence: intakePriceEstimate.confidence,
+      });
+    }
+
     // Start the research stream
     try {
       const response = await fetch("/api/research-stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requirements, sessionId }),
+        body: JSON.stringify({
+          requirements,
+          sessionId,
+          // Pass intake price estimate to skip recomputation
+          intakePriceEstimate: intakePriceEstimate ? {
+            distanceKm: intakePriceEstimate.distanceKm,
+            durationMinutes: intakePriceEstimate.durationMinutes,
+            priceRange: intakePriceEstimate.priceRange,
+            confidence: intakePriceEstimate.confidence,
+          } : null,
+        }),
       });
 
       if (!response.ok) {
@@ -855,6 +880,7 @@ What can I help you find today?`,
           languageMode,
           regionalLanguage: languageMode === "regional" ? regionalLanguage : undefined,
           priceIntel, // Pass price context for better negotiation
+          persona: negotiatorPersona, // Pass selected negotiator persona
         }),
       });
 
@@ -1549,6 +1575,7 @@ What can I help you find today?`,
     setRankedBusinesses([]);
     setCallStatuses(new Map());
     setPriceIntel(null);
+    setIntakePriceEstimate(null);
     setStrategies([]);
     setResearchSteps([]);
     setResearchPlan("");
@@ -1589,19 +1616,31 @@ What can I help you find today?`,
   };
 
   // Handler for booking form submission
-  const handleBookingFormSubmit = (formRequirements: UserRequirement) => {
+  const handleBookingFormSubmit = (formRequirements: UserRequirement, formPriceEstimate: BookingPriceEstimate | null) => {
     setRequirements(formRequirements);
+    setIntakePriceEstimate(formPriceEstimate);
     setStage("chat");
     addMessage("user", `I need a cab from ${formRequirements.from} to ${formRequirements.to} on ${formRequirements.date} at ${formRequirements.time}. ${formRequirements.tripType === "round-trip" ? "Round trip." : "One way."} ${formRequirements.passengers} passenger(s).`);
-    addMessage("assistant", `Perfect! I've got your trip details:
+
+    let confirmationMsg = `Perfect! I've got your trip details:
 
 **From:** ${formRequirements.from}
 **To:** ${formRequirements.to}
 **Date:** ${formRequirements.date} at ${formRequirements.time}
 **Trip:** ${formRequirements.tripType === "round-trip" ? "Round Trip" : "One Way"}
-**Passengers:** ${formRequirements.passengers}
+**Passengers:** ${formRequirements.passengers}`;
 
-Click **Find Providers** to search for the best cab services in your area.`);
+    if (formPriceEstimate) {
+      confirmationMsg += `
+
+**Expected Price Range:** ₹${formPriceEstimate.priceRange.low.toLocaleString()} - ₹${formPriceEstimate.priceRange.high.toLocaleString()}
+**Distance:** ${formPriceEstimate.distanceKm.toFixed(1)} km (~${Math.round(formPriceEstimate.durationMinutes)} mins)`;
+    }
+
+    confirmationMsg += `
+
+Click **Find Providers** to search for the best cab services in your area.`;
+    addMessage("assistant", confirmationMsg);
   };
 
   // Handler for calling more vendors (continue from where we left off)
@@ -1799,6 +1838,12 @@ Click **Find Providers** to search for the best cab services in your area.`);
             {/* Chat Messages for other stages */}
             {stage !== "service_selection" && stage !== "booking_form" && (
               <>
+                {/* Debug: show message count */}
+                {process.env.NODE_ENV === "development" && (
+                  <div className="text-xs text-gray-400 mb-2">
+                    [{messages.length} messages, stage: {stage}]
+                  </div>
+                )}
                 {messages.map((message) => (
                   <ChatMessage key={message.id} message={message} />
                 ))}
@@ -2117,7 +2162,7 @@ Click **Find Providers** to search for the best cab services in your area.`);
                     time: requirements?.time,
                     passengerCount: requirements?.passengers,
                     vehicleType: requirements?.vehicleType,
-                    tripType: "one-way", // Default to one-way for cab services
+                    tripType: requirements?.tripType || "one-way",
                     expectedPriceLow: priceIntel.baselinePrice.low,
                     expectedPriceMid: priceIntel.baselinePrice.mid,
                     expectedPriceHigh: priceIntel.baselinePrice.high,
@@ -2131,6 +2176,7 @@ Click **Find Providers** to search for the best cab services in your area.`);
                   }}
                   sessionId={sessionId}
                   systemPrompt={getCurrentPrompt(performanceStore)}
+                  persona={negotiatorPersona}
                   onCallComplete={handleSimCallComplete}
                   onSkip={handleSimSkip}
                 />

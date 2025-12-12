@@ -1,5 +1,24 @@
 // Core types for the Negotiator app
 
+// Negotiator persona type
+export type NegotiatorPersona = "preet";
+
+export interface NegotiatorPersonaConfig {
+  id: NegotiatorPersona;
+  name: string;
+  description: string;
+  style: string;
+}
+
+export const NEGOTIATOR_PERSONAS: Record<NegotiatorPersona, NegotiatorPersonaConfig> = {
+  preet: {
+    id: "preet",
+    name: "Preet",
+    description: "Independent Woman",
+    style: "Professional negotiator who negotiates once if prices seem high",
+  },
+};
+
 export interface UserRequirement {
   service: string; // e.g., "cab", "caterer", "photographer"
 
@@ -30,6 +49,15 @@ export interface UserRequirement {
   // Caterer: eventType, guestCount, mealTime, cuisineType, foodType, venueAddress, serviceType, menuPreferences, dietaryRestrictions
   // Photographer: shootType, duration, location, photoVideo, deliverables, teamSize, style, specialRequirements
   serviceFields?: Record<string, unknown>;
+
+  // Custom speech phrases - Bot will say EXACTLY what user types here
+  // These override the default location/date/time formatting
+  speechPhrases?: {
+    pickupPhrase?: string;   // e.g., "Koramangala se" - how to say pickup location
+    dropPhrase?: string;     // e.g., "Airport tak" - how to say drop location
+    datePhrase?: string;     // e.g., "bees December ko" - how to say the date
+    timePhrase?: string;     // e.g., "subah aath baje" - how to say the time
+  };
 
   // Status
   isComplete: boolean;

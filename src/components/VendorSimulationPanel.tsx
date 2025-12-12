@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Business } from "@/types";
+import { Business, NegotiatorPersona } from "@/types";
 
 interface Message {
   role: "agent" | "vendor" | "human";
@@ -48,6 +48,7 @@ interface VendorSimulationPanelProps {
   };
   sessionId: string;
   systemPrompt?: string; // Custom prompt from learning feedback
+  persona?: NegotiatorPersona; // Negotiator persona
   onCallComplete: (result: {
     vendorId: string;
     vendorName: string;
@@ -64,6 +65,7 @@ export function VendorSimulationPanel({
   context,
   sessionId,
   systemPrompt,
+  persona = "preet",
   onCallComplete,
   onSkip,
 }: VendorSimulationPanelProps) {
@@ -131,6 +133,7 @@ export function VendorSimulationPanel({
             ...context,
           },
           systemPrompt, // Pass custom prompt from learning feedback
+          persona, // Pass negotiator persona for consistent behavior
         }),
       });
 
@@ -155,9 +158,12 @@ export function VendorSimulationPanel({
   }, [sessionId, vendor.id, vendor.name, vendor.rating, vendor.distance, context, systemPrompt]);
 
   // Start the call when vendor changes
+  // Note: We intentionally exclude startCall from deps to prevent double-calls
+  // when the callback reference changes but vendor.id stays the same
   useEffect(() => {
     startCall();
-  }, [vendor.id, startCall]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendor.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

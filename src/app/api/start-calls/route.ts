@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeOutboundCall } from "@/lib/vapi";
-import { Business, UserRequirement } from "@/types";
+import { Business, UserRequirement, NegotiatorPersona } from "@/types";
 import { saveCallRecord, updateCallRecord, getCallRecordByCallId } from "@/lib/call-history";
 
 // Store active calls and lowest prices in memory (use Redis/DB in production)
@@ -18,7 +18,7 @@ const sessionLowestPrices = new Map<string, number>();
 
 export async function POST(request: NextRequest) {
   try {
-    const { businesses, requirements, sessionId, languageMode, regionalLanguage, priceIntel } = await request.json();
+    const { businesses, requirements, sessionId, languageMode, regionalLanguage, priceIntel, persona } = await request.json();
 
     if (!businesses || !requirements || !sessionId) {
       return NextResponse.json(
@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
     const useRegionalLanguages = languageMode === "regional";
     // Regional language code (hi, kn, te, ta, bn, mr, gu)
     const selectedRegionalLanguage = regionalLanguage || "hi";
+    // Negotiator persona
+    const selectedPersona: NegotiatorPersona = persona || "preet";
 
     // Get existing lowest price for this session (if any)
     let lowestPriceSoFar = sessionLowestPrices.get(sessionId);
@@ -62,7 +64,8 @@ export async function POST(request: NextRequest) {
           lowestPriceSoFar,
           useRegionalLanguages,
           selectedRegionalLanguage,
-          priceContext
+          priceContext,
+          selectedPersona
         );
 
         // Store call info

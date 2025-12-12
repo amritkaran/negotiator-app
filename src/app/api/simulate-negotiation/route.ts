@@ -8,6 +8,7 @@ import {
   logError,
 } from "@/lib/session-logger";
 import { buildNegotiationPrompt, NegotiationPromptContext } from "@/lib/prompts/negotiation-prompt";
+import { NegotiatorPersona, NEGOTIATOR_PERSONAS } from "@/types";
 
 interface NegotiationContext {
   vendorName: string;
@@ -35,6 +36,13 @@ interface NegotiationContext {
   vendorStrategy: string;
   callNumber: number;
   totalCalls: number;
+  // Custom speech phrases - Bot says EXACTLY what user typed
+  speechPhrases?: {
+    pickupPhrase?: string;   // e.g., "Koramangala se" - how to say pickup location
+    dropPhrase?: string;     // e.g., "Airport tak" - how to say drop location
+    datePhrase?: string;     // e.g., "bees December ko" - how to say the date
+    timePhrase?: string;     // e.g., "subah aath baje" - how to say the time
+  };
 }
 
 interface Message {
@@ -87,6 +95,19 @@ async function classifyVendorIntent(
     ? agentProposedPrices[agentProposedPrices.length - 1]
     : null;
 
+  // Build list of info we already have (so LLM doesn't flag questions we can answer)
+  const knownInfoList = [
+    context.from ? `Pickup: ${context.from}` : null,
+    context.to ? `Drop: ${context.to}` : null,
+    context.date ? `Date: ${context.date}` : null,
+    context.time ? `Time: ${context.time}` : null,
+    context.passengerCount ? `Passengers: ${context.passengerCount}` : null,
+    context.vehicleType ? `Vehicle: ${context.vehicleType}` : null,
+    context.tripType ? `Trip type: ${context.tripType}` : null,
+    context.waitingTime ? `Waiting time: ${context.waitingTime} mins` : null,
+    context.tollPreference ? `Toll preference: ${context.tollPreference}` : null,
+  ].filter(Boolean).join(", ");
+
   const prompt = `You are classifying a vendor's response in a price negotiation for cab/taxi services in India.
 The conversation may be in English, Hindi, Kannada, Tamil, Telugu, or mixed (Hinglish).
 
@@ -95,6 +116,7 @@ CONTEXT:
 - Market price range: ₹${context.expectedPriceLow} - ₹${context.expectedPriceHigh}
 ${lastAgentProposedPrice ? `- Agent's last proposed price: ₹${lastAgentProposedPrice}` : "- Agent hasn't proposed a specific price yet"}
 ${context.lowestPriceSoFar ? `- Best quote from other vendors: ₹${context.lowestPriceSoFar}` : ""}
+- KNOWN INFO (agent already has these answers): ${knownInfoList || "None"}
 
 RECENT CONVERSATION:
 ${recentMessages}
@@ -120,11 +142,13 @@ Classify the vendor's intent into ONE of these categories:
 4. "question" - Vendor is asking a question that needs human input
    Examples: "where exactly?", "kahan jana hai?", "how many people?", "kitne log?", "AC or non-AC?"
 
-   IMPORTANT - Questions that do NOT need human input (agent can deflect/handle):
+   IMPORTANT - Questions that do NOT need human input (set needsHumanInput: false):
+   - If the question is about something listed in KNOWN INFO above, agent already has the answer
    - "which provider/company gave you that quote?" → Agent can say "I don't recall the name" (this is agent's own tactic)
    - "who else are you talking to?" → Agent can deflect
    - "why do you need it?" → Agent can give generic answer
    - Questions about information the AGENT introduced (like competitor quotes) do NOT need human input
+   - Questions about trip type, passengers, vehicle, date, time → Check KNOWN INFO first!
 
 5. "information" - Vendor is providing information or availability
    Examples: "yes available", "we have Innova", "I'll send driver", "haan mil jayega"
@@ -147,8 +171,8 @@ RESPOND IN THIS EXACT JSON FORMAT:
   "confidence": 0.0-1.0,
   "extractedPrice": null or number (any price mentioned in vendor's response),
   "agreedToPrice": null or number (if vendor agreed to agent's proposed price of ₹${lastAgentProposedPrice || "N/A"}),
-  "needsHumanInput": true/false (true ONLY if vendor asked about USER-SPECIFIC info like exact location, passenger count, vehicle preference. FALSE if question is about agent's own claims like competitor names/quotes),
-  "humanInputReason": "category if needsHumanInput" (e.g., "exact_location", "passenger_count", "vehicle_type"). Use null for deflectable questions,
+  "needsHumanInput": true/false (IMPORTANT: set FALSE if the question is about something in KNOWN INFO above! Only true if vendor asks about info we DON'T have),
+  "humanInputReason": "category if needsHumanInput" (e.g., "exact_location", "passenger_count", "vehicle_type", "trip_type"). Use null if needsHumanInput is false,
   "humanInputQuestion": "the question to ask user if needsHumanInput",
   "summary": "Brief English translation/summary of what vendor said",
   "mentionsExtraCharges": true/false (true if vendor indicates price does NOT include toll/parking/other extras),
@@ -211,6 +235,7 @@ const conversationStore = new Map<string, {
   quotedPrice: number | null;
   isComplete: boolean;
   customSystemPrompt?: string; // Custom prompt from learning feedback
+  persona?: NegotiatorPersona; // Negotiator persona for consistent behavior
   agentProposedPrices: number[]; // Track prices the agent has proposed to detect vendor agreement
   counterOfferCount: number; // Track how many counter-offers agent has made
   vendorRefusedCount: number; // Track how many times vendor has refused
@@ -313,14 +338,17 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     action = body.action;
-    const { sessionId, vendorId, vendorResponse, context, systemPrompt } = body;
+    const { sessionId, vendorId, vendorResponse, context, systemPrompt, persona } = body;
+
+    // Extract persona (default to "preet")
+    const selectedPersona: NegotiatorPersona = persona || "preet";
 
     // Log all API calls for debugging
-    console.log(`[simulate-negotiation] Action: ${action}, Session: ${sessionId}, Vendor: ${vendorId}`);
+    console.log(`[simulate-negotiation] Action: ${action}, Session: ${sessionId}, Vendor: ${vendorId}, Persona: ${selectedPersona}`);
 
     if (action === "start") {
       // Start a new simulated negotiation
-      const result = await startNegotiation(sessionId, vendorId, context, systemPrompt);
+      const result = await startNegotiation(sessionId, vendorId, context, systemPrompt, selectedPersona);
       console.log(`[simulate-negotiation] ${action} completed in ${Date.now() - startTime}ms`);
       return result;
     } else if (action === "respond") {
@@ -379,9 +407,14 @@ async function startNegotiation(
   sessionId: string,
   vendorId: string,
   context: NegotiationContext,
-  customPrompt?: string
+  customPrompt?: string,
+  persona: NegotiatorPersona = "preet"
 ) {
   const key = `${sessionId}:${vendorId}`;
+
+  // Get persona config
+  const personaConfig = NEGOTIATOR_PERSONAS[persona];
+  const agentName = personaConfig.name;
 
   // Generate opening message from agent
   const model = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0.7 });
@@ -389,9 +422,15 @@ async function startNegotiation(
   // Use custom prompt from learning feedback if provided, otherwise use default
   const systemPrompt = customPrompt
     ? buildCustomizedPrompt(customPrompt, context)
-    : buildAgentSystemPrompt(context);
+    : buildAgentSystemPrompt(context, persona);
 
   const isFirstVendor = !context.lowestPriceSoFar;
+
+  // Use SAME first message as voice bot - this is critical for consistency!
+  // This mirrors the firstMessage in vapi.ts
+  const greeting = `Hello! Main ${agentName} bol rahi hoon. Kya meri baat ${context.vendorName.slice(0, 30)} se ho rahi hai?`;
+
+  // Generate thinking for context
   const thinkingPrompt = `You are about to call ${context.vendorName} for a ${context.service} booking.
 
 Context:
@@ -401,12 +440,13 @@ ${isFirstVendor
     ? "- This is the FIRST call - no benchmark yet. Use market range for negotiation."
     : `- Current benchmark: ₹${context.lowestPriceSoFar} (from ${context.bestVendorSoFar}). Use this as your leverage.`}
 - Vendor strategy: ${context.vendorStrategy}
+- Your persona: ${personaConfig.description} - ${personaConfig.style}
 
 What's your approach for this call? Think step by step about:
-1. How to greet professionally
+1. Confirm you're speaking with the right vendor first
 2. Get their quote FIRST - never reveal budget upfront
 3. ${isFirstVendor
-    ? `If quote > ₹${context.expectedPriceHigh}: counter with ₹${context.expectedPriceHigh}. If in range: try for ₹${context.expectedPriceLow}. If below range: ask if final.`
+    ? `If quote > ₹${context.expectedPriceHigh}: counter appropriately. If in range: try for ₹${context.expectedPriceLow}. If below range: ask if final.`
     : `If quote > benchmark ₹${context.lowestPriceSoFar}: mention benchmark. If at/below: ask if final, mention long-term interest.`}
 
 Respond with a brief internal thought (2-3 sentences).`;
@@ -420,16 +460,6 @@ Respond with a brief internal thought (2-3 sentences).`;
     ? thinkingResponse.content
     : JSON.stringify(thinkingResponse.content);
 
-  // Generate greeting
-  const greetingResponse = await model.invoke([
-    new SystemMessage(systemPrompt),
-    new HumanMessage("Start the call with a professional greeting. Ask if they provide the service and if they're available. Keep it brief and natural."),
-  ]);
-
-  const greeting = typeof greetingResponse.content === "string"
-    ? greetingResponse.content
-    : JSON.stringify(greetingResponse.content);
-
   const conversation = {
     context,
     messages: [{
@@ -442,6 +472,7 @@ Respond with a brief internal thought (2-3 sentences).`;
     quotedPrice: null,
     isComplete: false,
     customSystemPrompt: customPrompt, // Store for use in subsequent calls
+    persona, // Store persona for use in subsequent responses
     agentProposedPrices: [] as number[], // Track prices agent proposes
     counterOfferCount: 0, // Track counter-offers made
     vendorRefusedCount: 0, // Track vendor refusals
@@ -569,9 +600,10 @@ async function processVendorResponse(
   const model = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0.7 });
 
   // Use custom prompt from learning feedback if stored, otherwise use default
+  // Pass stored persona for consistency across conversation
   const systemPrompt = conversation.customSystemPrompt
     ? buildCustomizedPrompt(conversation.customSystemPrompt, conversation.context)
-    : buildAgentSystemPrompt(conversation.context);
+    : buildAgentSystemPrompt(conversation.context, conversation.persona || "preet");
 
   // Build conversation history for context
   const historyMessages = conversation.messages.map(m =>
@@ -587,7 +619,48 @@ async function processVendorResponse(
     question: vendorIntent.humanInputQuestion || vendorIntent.summary,
   };
 
-  // CHECK HITL CACHE: If question needs human input, check if we already have an answer cached
+  // CHECK CONTEXT FIRST: If we already have the answer in context, don't ask human
+  if (humanInputCheck.needsHuman && vendorIntent.humanInputReason) {
+    const ctx = conversation.context;
+    const reason = vendorIntent.humanInputReason.toLowerCase();
+
+    // Map of reasons to context values we already have
+    const contextAnswers: Record<string, string | undefined> = {
+      "passenger_count": ctx.passengerCount ? `${ctx.passengerCount} passenger${ctx.passengerCount > 1 ? 's' : ''}` : undefined,
+      "passengers": ctx.passengerCount ? `${ctx.passengerCount} passenger${ctx.passengerCount > 1 ? 's' : ''}` : undefined,
+      "vehicle_type": ctx.vehicleType || undefined,
+      "vehicle_preference": ctx.vehicleType || undefined,
+      "vehicle_model": ctx.vehicleType || undefined,
+      "vehicle": ctx.vehicleType || undefined,
+      "trip_type": ctx.tripType || undefined,
+      "return_trip": ctx.tripType === "round-trip" ? "Yes, round trip" : ctx.tripType === "one-way" ? "No, one-way only" : undefined,
+      "pickup_details": ctx.from || undefined,
+      "pickup_location": ctx.from || undefined,
+      "pickup": ctx.from || undefined,
+      "drop_details": ctx.to || undefined,
+      "drop_location": ctx.to || undefined,
+      "destination": ctx.to || undefined,
+      "date": ctx.date || undefined,
+      "time": ctx.time || undefined,
+      "date_time": ctx.date && ctx.time ? `${ctx.date} at ${ctx.time}` : ctx.date || ctx.time || undefined,
+      "waiting_time": ctx.waitingTime ? `${ctx.waitingTime} minutes` : undefined,
+      "toll_preference": ctx.tollPreference === "ok" ? "Tolls are fine" : ctx.tollPreference === "avoid" ? "Prefer to avoid tolls" : undefined,
+    };
+
+    // Check if we have an answer for this reason
+    const knownAnswer = contextAnswers[reason];
+    if (knownAnswer) {
+      console.log(`[HITL Context] Found answer in context for "${reason}": "${knownAnswer}"`);
+      humanInputCheck = {
+        needsHuman: false,
+        reason: vendorIntent.humanInputReason,
+        question: humanInputCheck.question,
+        knownAnswer,
+      };
+    }
+  }
+
+  // CHECK HITL CACHE: If still needs human input, check if we already have an answer cached
   if (humanInputCheck.needsHuman && vendorIntent.humanInputReason) {
     const cachedAnswer = checkHITLCache(sessionId, vendorIntent.humanInputReason);
     if (cachedAnswer) {
@@ -821,9 +894,10 @@ async function processHumanInput(
   const model = new ChatOpenAI({ modelName: "gpt-4o", temperature: 0.7 });
 
   // Use custom prompt from learning feedback if stored, otherwise use default
+  // Pass stored persona for consistency across conversation
   const systemPrompt = conversation.customSystemPrompt
     ? buildCustomizedPrompt(conversation.customSystemPrompt, conversation.context)
-    : buildAgentSystemPrompt(conversation.context);
+    : buildAgentSystemPrompt(conversation.context, conversation.persona || "preet");
 
   // Build conversation history
   const historyMessages = conversation.messages.slice(0, -1).map(m =>
@@ -1014,10 +1088,14 @@ function debugGetAllConversations() {
   });
 }
 
-function buildAgentSystemPrompt(context: NegotiationContext): string {
+function buildAgentSystemPrompt(context: NegotiationContext, persona: NegotiatorPersona = "preet"): string {
+  // Get agent name from persona
+  const agentName = NEGOTIATOR_PERSONAS[persona].name;
+
   // Build the shared prompt context from the negotiation context
   const promptContext: NegotiationPromptContext = {
-    agentName: "Preet",
+    agentName,
+    persona,
     vendorName: context.vendorName,
     service: context.service,
     from: context.from,
@@ -1030,6 +1108,8 @@ function buildAgentSystemPrompt(context: NegotiationContext): string {
     waitingTime: context.waitingTime,
     tollPreference: context.tollPreference as "ok" | "avoid" | "no-preference" | undefined,
     specialInstructions: context.specialInstructions,
+    // Custom speech phrases - Bot says EXACTLY what user typed
+    speechPhrases: context.speechPhrases,
     expectedPriceLow: context.expectedPriceLow,
     expectedPriceMid: context.expectedPriceMid,
     expectedPriceHigh: context.expectedPriceHigh,
@@ -1557,11 +1637,17 @@ function buildResponsePrompt(
   }
 
   if (phase === "greeting") {
-    return answerPrefix + "Respond to their greeting and ask about availability. Ask: 'What would be your rate for this trip?' WAIT for their quote - do NOT mention any price yourself.";
+    // PROGRESSIVE DISCLOSURE: Start simple, just ask about availability for the route
+    // DO NOT dump date, time, passengers, or ask for rate yet!
+    const from = ctx.from || "pickup";
+    const to = ctx.to || "destination";
+    return answerPrefix + `PROGRESSIVE DISCLOSURE - Keep it simple! Just say: "Mujhe ek cab chahiye ${from} se ${to} ke liye. Available hai?" Do NOT mention date, time, passengers, or ask for rate yet. Wait for vendor to respond or ask questions. Let the conversation flow naturally.`;
   }
 
   if (phase === "inquiry") {
-    return answerPrefix + "Ask about the price: 'What would you charge for this trip?' WAIT for their quote - do NOT reveal any budget or price yourself.";
+    // Vendor has responded to greeting - now answer their questions if they asked any
+    // Still don't dump all info at once - answer what they ask
+    return answerPrefix + `Answer any question the vendor asked. If they asked about date/time, tell them. If they asked about passengers, tell them. If they haven't asked anything specific yet, you can mention the date. Keep responses SHORT (1-2 sentences). Do NOT ask for rate yet - let the vendor offer it when ready.`;
   }
 
   if (phase === "negotiation") {
