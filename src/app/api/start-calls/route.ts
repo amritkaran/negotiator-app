@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
           recordingUrl: null,
           notes: null,
           sessionId,
+          isSynthetic: false,
         });
 
         results.push({

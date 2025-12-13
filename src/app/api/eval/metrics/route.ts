@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Get comparison with previous run
-    const allRuns = getEvalRuns();
+    const allRuns = await getEvalRuns();
     const previousRun = allRuns.length > 1 ? allRuns[1] : null;
     const comparison = compareMetrics(run.metrics, previousRun?.metrics || null);
 

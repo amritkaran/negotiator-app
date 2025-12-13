@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       recordingUrl: body.recordingUrl || null,
       notes: body.notes || null,
       sessionId: body.sessionId || "unknown",
+      isSynthetic: body.isSynthetic ?? false,
     };
 
     const savedRecord = await saveCallRecord(record);

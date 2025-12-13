@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     if (id) {
       // Get specific run
-      const run = getEvalRunById(id);
+      const run = await getEvalRunById(id);
       if (!run) {
         return NextResponse.json(
           { error: "Eval run not found" },
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // List all runs
-    const runs = getEvalRuns();
+    const runs = await getEvalRuns();
 
     return NextResponse.json({
       success: true,
