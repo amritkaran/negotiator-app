@@ -11,7 +11,9 @@ import {
   runEvalBatch,
   createSyntheticVendor,
   PERSONA_TEMPLATES,
+  SimulatedCallResult,
 } from "@/lib/eval";
+import { saveCallRecord } from "@/lib/call-history";
 
 // Default bot script for testing (mimics actual bot behavior)
 const DEFAULT_BOT_SCRIPT = [
@@ -22,6 +24,44 @@ const DEFAULT_BOT_SCRIPT = [
   "Theek hai, all-inclusive hai na? Toll, parking sab included?",
   "Okay, confirm karke thodi der mein callback karti hoon. Dhanyavaad!",
 ];
+
+// Helper to save simulated call to database
+async function saveSimulatedCallToDb(
+  result: SimulatedCallResult,
+  tripDetails: { from: string; to: string; date: string; time: string; vehicleType?: string; tripType?: string },
+  sessionId: string
+) {
+  // Build transcript from conversation
+  const transcript = result.conversation
+    .map(turn => `${turn.speaker === "bot" ? "Bot" : "Vendor"}: ${turn.text}`)
+    .join("\n");
+
+  await saveCallRecord({
+    callId: `synthetic-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+    vendorName: `${result.persona.name} (Synthetic)`,
+    vendorPhone: "0000000000", // Synthetic placeholder
+    dateTime: new Date().toISOString(),
+    duration: result.outcome.callDuration,
+    status: result.outcome.quoteObtained ? "completed" : "failed",
+    endedReason: result.outcome.endReason,
+    requirements: {
+      service: "cab",
+      from: tripDetails.from,
+      to: tripDetails.to,
+      date: tripDetails.date,
+      time: tripDetails.time,
+      vehicleType: tripDetails.vehicleType,
+      tripType: tripDetails.tripType,
+    },
+    quotedPrice: result.outcome.firstOffer,
+    negotiatedPrice: result.outcome.finalPrice,
+    transcript,
+    recordingUrl: null,
+    notes: `Synthetic call with persona: ${result.persona.id}`,
+    sessionId,
+    isSynthetic: true,
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,6 +84,7 @@ export async function POST(request: NextRequest) {
         high: 1200,
       },
       botScript = DEFAULT_BOT_SCRIPT,
+      saveToDb = false, // Set to true to save results to database
     } = body;
 
     // Generate vendors
@@ -61,9 +102,25 @@ export async function POST(request: NextRequest) {
     // Run eval batch
     const result = await runEvalBatch(vendors, botScript);
 
+    // Save to database if requested
+    let savedCount = 0;
+    if (saveToDb) {
+      const sessionId = `synthetic-batch-${Date.now()}`;
+      for (const simResult of result.results) {
+        try {
+          await saveSimulatedCallToDb(simResult, tripDetails, sessionId);
+          savedCount++;
+        } catch (err) {
+          console.error("[simulate] Failed to save call:", err);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       ...result,
+      savedToDb: saveToDb,
+      savedCount,
     });
   } catch (error) {
     console.error("[api/eval/simulate] error:", error);

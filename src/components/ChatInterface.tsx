@@ -649,8 +649,9 @@ What can I help you find today?`,
     }
   };
 
-  const handleSearchBusinesses = async () => {
-    if (!requirements?.from) return;
+  // Core search function that accepts requirements directly (avoids state timing issues)
+  const startResearch = async (reqs: UserRequirement, priceEst: BookingPriceEstimate | null) => {
+    if (!reqs?.from) return;
 
     setStage("researching");
     setCurrentAgent("research");
@@ -660,13 +661,13 @@ What can I help you find today?`,
     addMessage("assistant", "🔬 Starting deep research to find and analyze service providers...");
 
     // If we have intake price estimate, set it immediately so it displays during research
-    if (intakePriceEstimate) {
+    if (priceEst) {
       setPriceIntel({
-        estimatedDistance: intakePriceEstimate.distanceKm,
-        estimatedDuration: intakePriceEstimate.durationMinutes,
-        baselinePrice: intakePriceEstimate.priceRange,
-        factors: intakePriceEstimate.rationale || [],
-        confidence: intakePriceEstimate.confidence,
+        estimatedDistance: priceEst.distanceKm,
+        estimatedDuration: priceEst.durationMinutes,
+        baselinePrice: priceEst.priceRange,
+        factors: priceEst.rationale || [],
+        confidence: priceEst.confidence,
       });
     }
 
@@ -676,14 +677,14 @@ What can I help you find today?`,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requirements,
+          requirements: reqs,
           sessionId,
           // Pass intake price estimate to skip recomputation
-          intakePriceEstimate: intakePriceEstimate ? {
-            distanceKm: intakePriceEstimate.distanceKm,
-            durationMinutes: intakePriceEstimate.durationMinutes,
-            priceRange: intakePriceEstimate.priceRange,
-            confidence: intakePriceEstimate.confidence,
+          intakePriceEstimate: priceEst ? {
+            distanceKm: priceEst.distanceKm,
+            durationMinutes: priceEst.durationMinutes,
+            priceRange: priceEst.priceRange,
+            confidence: priceEst.confidence,
           } : null,
         }),
       });
@@ -725,6 +726,12 @@ What can I help you find today?`,
       setStage("chat");
       setCurrentAgent("");
     }
+  };
+
+  // Wrapper for button click (uses state values)
+  const handleSearchBusinesses = async () => {
+    if (!requirements) return;
+    await startResearch(requirements, intakePriceEstimate);
   };
 
   const handleResearchEvent = (data: Record<string, unknown>) => {
@@ -1615,14 +1622,17 @@ What can I help you find today?`,
     }
   };
 
-  // Handler for booking form submission
+  // Handler for booking form submission - directly triggers research
   const handleBookingFormSubmit = (formRequirements: UserRequirement, formPriceEstimate: BookingPriceEstimate | null) => {
+    // Store in state for later reference
     setRequirements(formRequirements);
     setIntakePriceEstimate(formPriceEstimate);
-    setStage("chat");
+
+    // Add the user's trip request to chat history
     addMessage("user", `I need a cab from ${formRequirements.from} to ${formRequirements.to} on ${formRequirements.date} at ${formRequirements.time}. ${formRequirements.tripType === "round-trip" ? "Round trip." : "One way."} ${formRequirements.passengers} passenger(s).`);
 
-    let confirmationMsg = `Perfect! I've got your trip details:
+    // Add confirmation message with trip details
+    let confirmationMsg = `Got it! Here's your trip:
 
 **From:** ${formRequirements.from}
 **To:** ${formRequirements.to}
@@ -1637,10 +1647,10 @@ What can I help you find today?`,
 **Distance:** ${formPriceEstimate.distanceKm.toFixed(1)} km (~${Math.round(formPriceEstimate.durationMinutes)} mins)`;
     }
 
-    confirmationMsg += `
-
-Click **Find Providers** to search for the best cab services in your area.`;
     addMessage("assistant", confirmationMsg);
+
+    // Directly start research (no second "Find Providers" button needed)
+    startResearch(formRequirements, formPriceEstimate);
   };
 
   // Handler for calling more vendors (continue from where we left off)
@@ -1734,6 +1744,13 @@ Click **Find Providers** to search for the best cab services in your area.`;
           >
             <span>📞</span>
             <span>Call History</span>
+          </Link>
+          <Link
+            href="/eval"
+            className="flex items-center gap-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg shadow-md transition-colors"
+          >
+            <span>📊</span>
+            <span>Eval</span>
           </Link>
           <button
             onClick={handleReset}

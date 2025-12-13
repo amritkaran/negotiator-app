@@ -32,7 +32,11 @@ export interface CallHistoryRecord {
   notes: string | null;
 
   sessionId: string;
+  isSynthetic: boolean; // true for simulated/synthetic calls, false for actual VAPI calls
 }
+
+// Filter type for querying calls
+export type CallDataFilter = "all" | "actual" | "synthetic";
 
 // Ensure database is initialized
 let dbInitialized = false;
@@ -68,6 +72,7 @@ function rowToRecord(row: Record<string, unknown>): CallHistoryRecord {
     recordingUrl: row.recording_url as string | null,
     notes: row.notes as string | null,
     sessionId: row.session_id as string,
+    isSynthetic: row.is_synthetic === true,
   };
 }
 
@@ -80,7 +85,7 @@ export async function saveCallRecord(
   const result = await sql`
     INSERT INTO call_history (
       call_id, vendor_name, vendor_phone, date_time, duration, status, ended_reason,
-      requirements, quoted_price, negotiated_price, transcript, recording_url, notes, session_id
+      requirements, quoted_price, negotiated_price, transcript, recording_url, notes, session_id, is_synthetic
     ) VALUES (
       ${record.callId},
       ${record.vendorName},
@@ -95,12 +100,13 @@ export async function saveCallRecord(
       ${record.transcript},
       ${record.recordingUrl},
       ${record.notes},
-      ${record.sessionId}
+      ${record.sessionId},
+      ${record.isSynthetic ?? false}
     )
     RETURNING *
   `;
 
-  console.log(`[call-history] Saved call record: ${result[0].id}`);
+  console.log(`[call-history] Saved call record: ${result[0].id} (synthetic: ${record.isSynthetic ?? false})`);
   return rowToRecord(result[0]);
 }
 
@@ -169,15 +175,35 @@ export async function getCallRecordByCallId(
   return rowToRecord(result[0]);
 }
 
-export async function getAllCallRecords(limit: number = 50): Promise<CallHistoryRecord[]> {
+export async function getAllCallRecords(
+  limit: number = 50,
+  filter: CallDataFilter = "all"
+): Promise<CallHistoryRecord[]> {
   await ensureDb();
   const sql = getDb();
 
-  const result = await sql`
-    SELECT * FROM call_history
-    ORDER BY date_time DESC
-    LIMIT ${limit}
-  `;
+  let result;
+  if (filter === "actual") {
+    result = await sql`
+      SELECT * FROM call_history
+      WHERE is_synthetic = FALSE OR is_synthetic IS NULL
+      ORDER BY date_time DESC
+      LIMIT ${limit}
+    `;
+  } else if (filter === "synthetic") {
+    result = await sql`
+      SELECT * FROM call_history
+      WHERE is_synthetic = TRUE
+      ORDER BY date_time DESC
+      LIMIT ${limit}
+    `;
+  } else {
+    result = await sql`
+      SELECT * FROM call_history
+      ORDER BY date_time DESC
+      LIMIT ${limit}
+    `;
+  }
 
   return result.map(rowToRecord);
 }

@@ -47,9 +47,7 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
   const [returnMinute, setReturnMinute] = useState<string>("");
   const [returnAmpm, setReturnAmpm] = useState<string>("");
 
-  // Additional details for vendor conversation
-  const [pickupPoint, setPickupPoint] = useState<string>("");
-  const [dropPoint, setDropPoint] = useState<string>("");
+  // Special instructions for vendor
   const [specialInstructions, setSpecialInstructions] = useState<string>("");
 
   // Custom speech phrases - Bot will say EXACTLY what user types
@@ -167,12 +165,6 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
       },
       isComplete: true,
       missingFields: [],
-      // Additional details for vendor conversation
-      serviceFields: {
-        pickupPoint: pickupPoint || undefined,
-        dropPoint: dropPoint || undefined,
-        specialInstructions: specialInstructions || undefined,
-      },
       specialInstructions: specialInstructions || undefined,
       // Custom speech phrases - Bot will say EXACTLY what user types
       speechPhrases: {
@@ -340,27 +332,14 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
               </div>
 
               {priceEstimate && (
-                <div className="flex items-center gap-3">
-                  <div className={`
-                    px-2 py-1 rounded-full text-xs font-medium
-                    ${priceEstimate.confidence === "high"
-                      ? "bg-green-100 text-green-700"
-                      : priceEstimate.confidence === "medium"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-gray-100 text-gray-600"
-                    }
-                  `}>
-                    {priceEstimate.confidence === "high" ? "High" : priceEstimate.confidence === "medium" ? "Medium" : "Low"} confidence
-                  </div>
-                  <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${priceExpanded ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+                <svg
+                  className={`w-5 h-5 text-gray-400 transition-transform ${priceExpanded ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               )}
             </div>
 
@@ -537,52 +516,19 @@ export function BookingForm({ onSubmit, isLoading = false }: BookingFormProps) {
         </>
       )}
 
-      {/* Additional Details for Vendor - Only show after price estimate is loaded */}
+      {/* Special Request */}
       {priceEstimate && (
         <div className="border-t border-gray-200 pt-4 mt-4">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Additional Details for Vendor</h3>
-
-          {/* Pickup Point */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Pickup Point (e.g., Gate number, landmark)
-            </label>
-            <input
-              type="text"
-              value={pickupPoint}
-              onChange={(e) => setPickupPoint(e.target.value)}
-              placeholder="e.g., Main gate, Near temple, Building A entrance"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400"
-            />
-          </div>
-
-          {/* Drop Point */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Drop Point (e.g., Terminal, specific location)
-            </label>
-            <input
-              type="text"
-              value={dropPoint}
-              onChange={(e) => setDropPoint(e.target.value)}
-              placeholder="e.g., Terminal 1, Building entrance, Gate 3"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400"
-            />
-          </div>
-
-          {/* Special Instructions */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Special Instructions for Vendor
-            </label>
-            <textarea
-              value={specialInstructions}
-              onChange={(e) => setSpecialInstructions(e.target.value)}
-              placeholder="e.g., Extra luggage, need child seat, early morning pickup call required"
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 resize-none"
-            />
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Special Request (Optional)
+          </label>
+          <textarea
+            value={specialInstructions}
+            onChange={(e) => setSpecialInstructions(e.target.value)}
+            placeholder="e.g., Extra luggage, need child seat, early morning pickup call required"
+            rows={2}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400 resize-none"
+          />
         </div>
       )}
 

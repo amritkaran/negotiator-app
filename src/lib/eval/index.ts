@@ -47,10 +47,14 @@ export {
 // Eval Metrics
 export {
   // Types
+  type CallAnalysisForEval,
   type EvalMetrics,
   type EvalRunResult,
   type EvalComparison,
   // Functions
+  analyzeCallForEval,
+  analyzeCallsForEval,
+  calculateBasicMetrics,
   calculateMetrics,
   calculateMetricsByPeriod,
   compareMetrics,
