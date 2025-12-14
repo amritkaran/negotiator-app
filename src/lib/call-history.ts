@@ -245,3 +245,15 @@ export async function clearAllRecords(): Promise<void> {
   await sql`DELETE FROM call_history`;
   console.log(`[call-history] Cleared all records`);
 }
+
+export async function deleteSyntheticCalls(): Promise<number> {
+  await ensureDb();
+  const sql = getDb();
+  const result = await sql`
+    DELETE FROM call_history
+    WHERE is_synthetic = TRUE
+    RETURNING id
+  `;
+  console.log(`[call-history] Deleted ${result.length} synthetic call records`);
+  return result.length;
+}

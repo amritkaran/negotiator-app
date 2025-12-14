@@ -3,6 +3,7 @@ import {
   getAllCallRecords,
   saveCallRecord,
   CallHistoryRecord,
+  deleteSyntheticCalls,
 } from "@/lib/call-history";
 
 // GET /api/call-history - Get all call records
@@ -57,6 +58,34 @@ export async function POST(request: NextRequest) {
     console.error("[call-history] POST error:", error);
     return NextResponse.json(
       { error: "Failed to create call record" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/call-history?synthetic=true - Delete synthetic call records
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const deleteSynthetic = searchParams.get("synthetic") === "true";
+
+    if (deleteSynthetic) {
+      const deletedCount = await deleteSyntheticCalls();
+      return NextResponse.json({
+        success: true,
+        message: `Deleted ${deletedCount} synthetic call records`,
+        deletedCount,
+      });
+    }
+
+    return NextResponse.json(
+      { error: "Specify ?synthetic=true to delete synthetic calls" },
+      { status: 400 }
+    );
+  } catch (error) {
+    console.error("[call-history] DELETE error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete call records" },
       { status: 500 }
     );
   }
